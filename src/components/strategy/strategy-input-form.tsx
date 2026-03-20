@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useProjectStore } from '@/stores/project-store';
-import { Loader2, Plus, X, Sparkles } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, Search, Users } from 'lucide-react';
 import type { StrategyInput } from '@/types/strategy';
+import type { CrawlResult } from '@/types/strategy';
 
 interface StrategyInputFormProps {
   onSubmit: (input: StrategyInput) => void;
@@ -32,6 +33,63 @@ export function StrategyInputForm({ onSubmit, isGenerating }: StrategyInputFormP
   const [competitorInput, setCompetitorInput] = useState('');
   const [monthlyRange, setMonthlyRange] = useState('');
   const [teamSize, setTeamSize] = useState('1');
+  const [isSuggestingKeywords, setIsSuggestingKeywords] = useState(false);
+  const [isSuggestingCompetitors, setIsSuggestingCompetitors] = useState(false);
+  const [suggestedKeywords, setSuggestedKeywords] = useState<{ keyword: string; reason: string; type: string }[]>([]);
+  const [suggestedCompetitors, setSuggestedCompetitors] = useState<{ name: string; url?: string; type: string; reason: string; strength: string }[]>([]);
+
+  const suggestKeywords = async () => {
+    if (!industry && !services) return;
+    setIsSuggestingKeywords(true);
+    try {
+      // Crawl URLs first if available
+      let crawlData: CrawlResult[] | undefined;
+      const validUrls = targetUrls.filter(Boolean);
+      if (validUrls.length > 0) {
+        const crawlRes = await fetch('/api/ai/strategy/crawl', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ urls: validUrls }),
+        });
+        if (crawlRes.ok) {
+          const d = await crawlRes.json();
+          crawlData = d.results;
+        }
+      }
+
+      const res = await fetch('/api/ai/strategy/suggest-keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ industry, services, targetCustomer, usp, crawlData }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSuggestedKeywords(data.keywords || []);
+        // Auto-fill seed keywords
+        const kwList = (data.keywords || []).map((k: { keyword: string }) => k.keyword);
+        setSeedKeywords(kwList.join(', '));
+      }
+    } catch { /* ignore */ }
+    setIsSuggestingKeywords(false);
+  };
+
+  const suggestCompetitors = async () => {
+    if (!industry && !services) return;
+    setIsSuggestingCompetitors(true);
+    try {
+      const res = await fetch('/api/ai/strategy/suggest-competitors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ industry, services, targetCustomer, usp }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSuggestedCompetitors(data.competitors || []);
+        setCompetitors((data.competitors || []).map((c: { name: string; url?: string }) => ({ name: c.name, url: c.url })));
+      }
+    } catch { /* ignore */ }
+    setIsSuggestingCompetitors(false);
+  };
 
   const handleSubmit = () => {
     const input: StrategyInput = {
@@ -93,15 +151,37 @@ export function StrategyInputForm({ onSubmit, isGenerating }: StrategyInputFormP
 
       {/* 키워드 시드 */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">🔍 핵심 키워드 (필수, 쉼표 구분)</label>
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium">🔍 핵심 키워드 (필수, 쉼표 구분)</label>
+          <Button variant="outline" size="sm" onClick={suggestKeywords} disabled={isSuggestingKeywords || (!industry && !services)}>
+            {isSuggestingKeywords ? <><Loader2 size={14} className="animate-spin mr-1" />분석 중...</> : <><Search size={14} className="mr-1" />AI 키워드 추천</>}
+          </Button>
+        </div>
         <Textarea placeholder="성장클리닉, 키크는법, 성조숙증, 성장호르몬" value={seedKeywords} onChange={(e) => setSeedKeywords(e.target.value)} rows={2} />
+        {suggestedKeywords.length > 0 && (
+          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg space-y-1.5">
+            <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">AI 추천 키워드 ({suggestedKeywords.length}개)</div>
+            <div className="flex gap-1.5 flex-wrap">
+              {suggestedKeywords.map((k, i) => (
+                <span key={i} className="group relative px-2 py-1 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 rounded text-xs font-medium cursor-default" title={`${k.reason} [${k.type}]`}>
+                  {k.keyword}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 경쟁사 */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">⚔️ 경쟁사 (선택)</label>
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium">⚔️ 경쟁사 (선택)</label>
+          <Button variant="outline" size="sm" onClick={suggestCompetitors} disabled={isSuggestingCompetitors || (!industry && !services)}>
+            {isSuggestingCompetitors ? <><Loader2 size={14} className="animate-spin mr-1" />탐색 중...</> : <><Users size={14} className="mr-1" />AI 경쟁사 탐색</>}
+          </Button>
+        </div>
         <div className="flex gap-2">
-          <Input placeholder="경쟁사 이름" value={competitorInput} onChange={(e) => setCompetitorInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCompetitor()} />
+          <Input placeholder="경쟁사 이름 (직접 추가)" value={competitorInput} onChange={(e) => setCompetitorInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCompetitor()} />
           <Button variant="outline" onClick={addCompetitor}><Plus size={14} /></Button>
         </div>
         {competitors.length > 0 && (
@@ -112,6 +192,20 @@ export function StrategyInputForm({ onSubmit, isGenerating }: StrategyInputFormP
                 <button onClick={() => setCompetitors(competitors.filter((_, idx) => idx !== i))}><X size={12} /></button>
               </span>
             ))}
+          </div>
+        )}
+        {suggestedCompetitors.length > 0 && (
+          <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg space-y-1.5">
+            <div className="text-xs font-semibold text-amber-700 dark:text-amber-400">AI 탐색 경쟁사 ({suggestedCompetitors.length}개)</div>
+            <div className="space-y-1">
+              {suggestedCompetitors.map((c, i) => (
+                <div key={i} className="text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground">{c.name}</span>
+                  <span className="ml-1.5 px-1.5 py-0.5 bg-muted rounded text-[10px]">{c.type === 'direct' ? '직접' : '간접'}</span>
+                  <span className="ml-1.5">{c.reason}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
