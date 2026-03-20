@@ -34,6 +34,7 @@ interface ProjectState {
   youtubeCards: YoutubeCard[];
   sidebarCollapsed: boolean;
   showProjectSettings: boolean;
+  showStrategy: boolean;
   searchQuery: string;
   filterStatus: ContentStatus | 'all';
   sortBy: 'name' | 'date';
@@ -133,6 +134,8 @@ interface ProjectState {
   // UI state
   openProjectSettings: (projectId: string) => void;
   setShowProjectSettings: (show: boolean) => void;
+  openStrategy: (projectId: string) => void;
+  setShowStrategy: (show: boolean) => void;
   setSearchQuery: (query: string) => void;
   setFilterStatus: (status: ContentStatus | 'all') => void;
   setSortBy: (sortBy: 'name' | 'date') => void;
@@ -156,6 +159,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
   strategies: [],
   sidebarCollapsed: false,
   showProjectSettings: false,
+  showStrategy: false,
   searchQuery: '',
   filterStatus: 'all',
   sortBy: 'name',
@@ -163,7 +167,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
 
   setProjects: (projects) => set({ projects }),
   selectProject: (projectId) =>
-    set({ selectedProjectId: projectId, selectedContentId: null, showProjectSettings: false }),
+    set({ selectedProjectId: projectId, selectedContentId: null, showProjectSettings: false, showStrategy: false }),
   selectContent: (contentId) => {
     if (contentId) {
       const content = get().contents.find(c => c.id === contentId);
@@ -171,6 +175,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
         selectedContentId: contentId,
         selectedProjectId: content?.project_id ?? get().selectedProjectId,
         showProjectSettings: false,
+        showStrategy: false,
       });
     } else {
       set({ selectedContentId: null });
@@ -1050,9 +1055,13 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
 
   // UI state
   openProjectSettings: (projectId) => {
-    set({ selectedProjectId: projectId, selectedContentId: null, showProjectSettings: true });
+    set({ selectedProjectId: projectId, selectedContentId: null, showProjectSettings: true, showStrategy: false });
   },
-  setShowProjectSettings: (show) => set({ showProjectSettings: show }),
+  setShowProjectSettings: (show) => set({ showProjectSettings: show, showStrategy: false }),
+  openStrategy: (projectId) => {
+    set({ selectedProjectId: projectId, selectedContentId: null, showProjectSettings: false, showStrategy: true });
+  },
+  setShowStrategy: (show) => set({ showStrategy: show, showProjectSettings: false }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setFilterStatus: (status) => set({ filterStatus: status }),
   setSortBy: (sortBy) => set({ sortBy }),

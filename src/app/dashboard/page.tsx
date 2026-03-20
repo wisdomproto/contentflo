@@ -1,11 +1,10 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useProjectStore } from '@/stores/project-store';
 import { ContentTabs } from '@/components/content/content-tabs';
 import { ProjectSettings } from '@/components/project/project-settings';
-import { Button } from '@/components/ui/button';
-import { FolderOpen, Target } from 'lucide-react';
+import { StrategyDashboard } from '@/components/strategy/strategy-dashboard';
+import { FolderOpen } from 'lucide-react';
 
 function EmptyState() {
   return (
@@ -24,41 +23,24 @@ function EmptyState() {
   );
 }
 
-function StrategyBar() {
-  const router = useRouter();
-  return (
-    <div className="px-4 py-2 border-b border-border bg-background flex items-center justify-end">
-      <Button variant="outline" size="sm" onClick={() => router.push('/dashboard/strategy')}>
-        <Target size={14} className="mr-1.5" />
-        AI 마케팅 전략
-      </Button>
-    </div>
-  );
-}
-
 export default function DashboardPage() {
-  const { selectedProjectId, selectedContentId, showProjectSettings, projects } = useProjectStore();
+  const { selectedProjectId, selectedContentId, showProjectSettings, showStrategy, projects } = useProjectStore();
 
   if (!selectedProjectId) {
     return <EmptyState />;
+  }
+
+  // Show strategy dashboard
+  if (showStrategy) {
+    return <StrategyDashboard />;
   }
 
   // Show project settings when explicitly requested or no content selected
   if (showProjectSettings || !selectedContentId) {
     const project = projects.find((p) => p.id === selectedProjectId);
     if (!project) return <EmptyState />;
-    return (
-      <div className="flex flex-col h-full">
-        <StrategyBar />
-        <ProjectSettings project={project} />
-      </div>
-    );
+    return <ProjectSettings project={project} />;
   }
 
-  return (
-    <div className="flex flex-col h-full">
-      <StrategyBar />
-      <ContentTabs />
-    </div>
-  );
+  return <ContentTabs />;
 }

@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   FolderOpen, FolderClosed, FileText, Plus, ChevronRight, ChevronDown,
   MoreHorizontal, Search, Filter, ArrowUpDown, Pencil, Settings, Copy,
-  Trash2, PanelLeftClose, PanelLeft,
+  Trash2, PanelLeftClose, PanelLeft, Target,
 } from 'lucide-react';
 import { useProjectStore } from '@/stores/project-store';
 import { cn } from '@/lib/utils';
@@ -132,7 +132,7 @@ function ProjectItem({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.name);
   const renameRef = useRef<HTMLInputElement>(null);
-  const { selectProject, updateProject, deleteProject, duplicateProject, openProjectSettings } = useProjectStore();
+  const { selectProject, updateProject, deleteProject, duplicateProject, openProjectSettings, openStrategy, showStrategy } = useProjectStore();
 
   useEffect(() => {
     if (isRenaming) renameRef.current?.focus();
@@ -217,6 +217,18 @@ function ProjectItem({
 
       {expanded && (
         <div className="ml-4 pl-2 border-l border-border">
+          {/* 마케팅 전략 고정 항목 */}
+          <button
+            onClick={() => openStrategy(project.id)}
+            className={cn(
+              'w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors',
+              'hover:bg-accent',
+              isSelected && showStrategy && 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+            )}
+          >
+            <Target size={14} className="shrink-0 text-emerald-600" />
+            <span className="flex-1 text-left truncate font-medium">마케팅 전략</span>
+          </button>
           {contents.map((content) => (
             <ContentItem
               key={content.id}
