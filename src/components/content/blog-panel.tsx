@@ -1,0 +1,510 @@
+'use client';
+
+import { useCallback, useState, useMemo, useEffect } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { BlogCardItem, AddCardButton } from './blog-card-item';
+import { ChannelModelSelector } from './channel-model-selector';
+import { ChannelContentList } from './channel-content-list';
+import { PromptEditDialog } from './prompt-edit-dialog';
+import { BlogPreviewDialog } from './blog-preview-dialog';
+import { NaverKeywordPanel } from './naver-keyword-panel';
+import { useAiGeneration } from '@/hooks/use-ai-generation';
+import { useCardImageGeneration } from '@/hooks/use-card-image-generation';
+import { useProjectStore } from '@/stores/project-store';
+import { buildBlogPrompt, buildBlogImagePromptForCard } from '@/lib/prompt-builder';
+import { calculateNaverSeoScore, type SeoDetail } from '@/lib/seo-scorer';
+import { Sparkles, Eye, Loader2, ChevronDown, ChevronRight, ImageIcon, X, Plus } from 'lucide-react';
+import type { Content, Project, BlogContent, BlogCard } from '@/types/database';
+import { generateId, cn } from '@/lib/utils';
+
+function SeoScoreDisplay({ score, details }: { score: number; details: SeoDetail[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const color = score >= 80 ? 'text-green-600' : score >= 50 ? 'text-yellow-600' : 'text-red-600';
+
+  return (
+    <div className="space-y-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 text-sm"
+      >
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <span className="font-medium">SEO 점수</span>
+        <span className={cn('font-bold text-lg', color)}>{score}</span>
+        <span className="text-muted-foreground text-xs">/ 100</span>
+      </button>
+      {expanded && (
+        <div className="space-y-1.5 pl-6">
+          {details.map((d) => (
+            <div key={d.category} className="flex items-center gap-2 text-xs">
+              <div className={cn('w-14 text-right font-mono font-medium', d.score >= d.maxScore * 0.8 ? 'text-green-600' : d.score >= d.maxScore * 0.5 ? 'text-yellow-600' : 'text-red-600')}>
+                {d.score}/{d.maxScore}
+              </div>
+              <div className="w-20 font-medium">{d.label}</div>
+              <div className="text-muted-foreground flex-1">{d.message}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Inner: 개별 블로그 콘텐츠 ────────────────────────────────
+
+interface BlogPanelInnerProps {
+  blogContent: BlogContent;
+  content: Content;
+  project: Project;
+  hasBaseArticle: boolean;
+  channelModels: { textModel: string; imageModel: string; aspectRatio: string; imageStyle: string };
+}
+
+function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channelModels }: BlogPanelInnerProps) {
+  const {
+    getBaseArticle,
+    getBlogCards,
+    updateBlogContent,
+    setBlogCardsForContent,
+    updateBlogCard,
+    deleteBlogCard,
+    addBlogCard,
+  } = useProjectStore();
+
+  const baseArticle = getBaseArticle(content.id);
+  const cards = getBlogCards(blogContent.id);
+
+  const [showPromptDialog, setShowPromptDialog] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [generatedPrompt, setGeneratedPrompt] = useState('');
+  // SEO 상태
+  const existingKeywords = blogContent.naver_keywords as { primary?: string; secondary?: string[] } | null;
+  const [seoTitle, setSeoTitle] = useState(blogContent.seo_title ?? '');
+  const [primaryKeyword, setPrimaryKeyword] = useState(existingKeywords?.primary ?? '');
+  const [secondaryKeywords, setSecondaryKeywords] = useState<string[]>(existingKeywords?.secondary ?? []);
+  const [newKeywordInput, setNewKeywordInput] = useState('');
+
+  // 기본글이 있고 아직 SEO 제목/키워드가 비어있으면 자동 세팅
+  useEffect(() => {
+    if (!hasBaseArticle) return;
+    if (!seoTitle && !blogContent.seo_title) {
+      const autoTitle = content.title || '';
+      if (autoTitle) {
+        setSeoTitle(autoTitle);
+        updateBlogContent(blogContent.id, { seo_title: autoTitle });
+      }
+    }
+    if (!primaryKeyword && !existingKeywords?.primary) {
+      const tags = content.tags ?? [];
+      if (tags.length > 0) {
+        const primary = tags[0];
+        const secondary = tags.slice(1);
+        setPrimaryKeyword(primary);
+        setSecondaryKeywords(secondary);
+        updateBlogContent(blogContent.id, { naver_keywords: { primary, secondary } });
+      } else if (content.title) {
+        setPrimaryKeyword(content.title);
+        updateBlogContent(blogContent.id, { naver_keywords: { primary: content.title, secondary: [] } });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasBaseArticle, blogContent.id]);
+
+  // SEO Score
+  const naverKeywords = useMemo(() => ({
+    primary: primaryKeyword,
+    secondary: secondaryKeywords,
+  }), [primaryKeyword, secondaryKeywords]);
+
+  const seoResult = useMemo(() => {
+    return calculateNaverSeoScore(seoTitle, cards, naverKeywords);
+  }, [seoTitle, cards, naverKeywords]);
+
+  const saveKeywords = useCallback((primary: string, secondary: string[]) => {
+    updateBlogContent(blogContent.id, { naver_keywords: { primary, secondary } });
+  }, [blogContent.id, updateBlogContent]);
+
+  const handlePrimaryKeywordChange = (value: string) => {
+    setPrimaryKeyword(value);
+    saveKeywords(value, secondaryKeywords);
+  };
+
+  const handleAddSecondaryKeyword = () => {
+    const kw = newKeywordInput.trim();
+    if (!kw || secondaryKeywords.includes(kw)) return;
+    const updated = [...secondaryKeywords, kw];
+    setSecondaryKeywords(updated);
+    setNewKeywordInput('');
+    saveKeywords(primaryKeyword, updated);
+  };
+
+  const handleRemoveSecondaryKeyword = (kw: string) => {
+    const updated = secondaryKeywords.filter((k) => k !== kw);
+    setSecondaryKeywords(updated);
+    saveKeywords(primaryKeyword, updated);
+  };
+
+  // AI text generation
+  const { isGenerating, generate, abort } = useAiGeneration({
+    onComplete: useCallback(
+      (fullText: string) => {
+        try {
+          let sections: { text: string; alt?: string; caption?: string }[];
+          let aiSeoTitle: string | undefined;
+          let aiPrimaryKw: string | undefined;
+          let aiSecondaryKws: string[] | undefined;
+
+          const objMatch = fullText.match(/\{[\s\S]*\}/);
+          const arrMatch = fullText.match(/\[[\s\S]*\]/);
+
+          if (objMatch) {
+            try {
+              const parsed = JSON.parse(objMatch[0]) as {
+                seo_title?: string;
+                primary_keyword?: string;
+                secondary_keywords?: string[];
+                sections?: { text: string; alt?: string; caption?: string }[];
+              };
+              sections = parsed.sections ?? [];
+              aiSeoTitle = parsed.seo_title;
+              aiPrimaryKw = parsed.primary_keyword;
+              aiSecondaryKws = parsed.secondary_keywords;
+            } catch {
+              if (!arrMatch) throw new Error('JSON 형식을 찾을 수 없습니다.');
+              sections = JSON.parse(arrMatch[0]);
+            }
+          } else if (arrMatch) {
+            sections = JSON.parse(arrMatch[0]);
+          } else {
+            throw new Error('JSON 형식을 찾을 수 없습니다.');
+          }
+
+          const finalTitle = aiSeoTitle || seoTitle || content.title || '';
+          if (aiSeoTitle) setSeoTitle(aiSeoTitle);
+          if (aiPrimaryKw) {
+            setPrimaryKeyword(aiPrimaryKw);
+            setSecondaryKeywords(aiSecondaryKws ?? []);
+          }
+
+          updateBlogContent(blogContent.id, {
+            seo_title: finalTitle || null,
+            ...(aiPrimaryKw ? { naver_keywords: { primary: aiPrimaryKw, secondary: aiSecondaryKws ?? [] } } : {}),
+          });
+
+          const now = new Date().toISOString();
+          const newCards: BlogCard[] = sections.map((section, i) => ({
+            id: generateId('bc'),
+            blog_content_id: blogContent.id,
+            card_type: 'text' as const,
+            content: {
+              text: section.text || '',
+              url: '',
+              alt: section.alt || '',
+              caption: section.caption || '',
+              image_prompt: '',
+              image_style: '',
+            },
+            sort_order: i,
+            created_at: now,
+            updated_at: now,
+          }));
+
+          setBlogCardsForContent(blogContent.id, newCards);
+        } catch {
+          alert('블로그 섹션 파싱 실패. 다시 시도해 주세요.');
+        }
+      },
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [blogContent.id, seoTitle, updateBlogContent, setBlogCardsForContent]
+    ),
+    onError: useCallback((err: string) => {
+      alert(`AI 생성 오류: ${err}`);
+    }, []),
+  });
+
+  // Image generation (공통 훅)
+  const { isGeneratingImage, generatingCardId, generateCardImage, generateAllImages: generateAllCardImages } = useCardImageGeneration({
+    getPrompt: (card: BlogCard) => {
+      const cardContent = card.content as { image_prompt?: string; image_style?: string };
+      const style = cardContent.image_style || channelModels.imageStyle || '';
+      if (cardContent.image_prompt) return style ? `${style}.\n${cardContent.image_prompt}` : cardContent.image_prompt;
+      const idx = cards.findIndex((c) => c.id === card.id);
+      return buildBlogImagePromptForCard(project, cards, idx, style);
+    },
+    getExistingImage: (card: BlogCard) => (card.content as Record<string, unknown>)?.url as string || null,
+    saveResult: (cardId: string, dataUrl: string, prompt: string) => {
+      const latest = useProjectStore.getState().getBlogCards(blogContent.id).find((c) => c.id === cardId);
+      updateBlogCard(cardId, { content: { ...(latest?.content ?? {}), url: dataUrl, image_prompt: prompt } });
+    },
+    shouldSkip: (card: BlogCard) => !!(card.content as Record<string, unknown>)?.url,
+    imageModel: channelModels.imageModel,
+    aspectRatio: channelModels.aspectRatio || '16:9',
+    imageStyle: channelModels.imageStyle,
+  });
+
+  const handleGenerateCardImage = (cardId: string) => generateCardImage(cardId, cards);
+  const handleGenerateAllImages = () => generateAllCardImages(cards);
+
+  const handleGenerate = () => {
+    const prompt = buildBlogPrompt({
+      project,
+      content,
+      baseArticle: baseArticle ?? undefined,
+      seoTitle,
+      keywords: naverKeywords,
+    });
+    setGeneratedPrompt(prompt);
+    setShowPromptDialog(true);
+  };
+
+  const handleStartGeneration = (prompt: string) => {
+    generate(prompt, channelModels.textModel);
+  };
+
+  const handleCardUpdate = (cardId: string, newContent: Record<string, unknown>) => {
+    updateBlogCard(cardId, { content: newContent });
+  };
+
+  const handleCardDelete = (cardId: string) => {
+    deleteBlogCard(cardId);
+  };
+
+  const handleAddSection = () => {
+    addBlogCard(blogContent.id, 'text', cards.length);
+    const latestCards = useProjectStore.getState().getBlogCards(blogContent.id);
+    const newCard = latestCards[latestCards.length - 1];
+    if (newCard) {
+      updateBlogCard(newCard.id, {
+        content: { text: '', url: '', alt: '', caption: '', image_prompt: '', image_style: '' },
+      });
+    }
+  };
+
+  const handleSeoTitleChange = (value: string) => {
+    setSeoTitle(value);
+    updateBlogContent(blogContent.id, { seo_title: value || null });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Action buttons */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          {cards.length > 0 && (
+            <Badge variant="secondary" className="text-xs">{cards.length}개 섹션</Badge>
+          )}
+          {isGenerating && (
+            <Badge variant="outline" className="text-xs gap-1 text-blue-600">
+              <Loader2 size={10} className="animate-spin" /> 생성 중...
+            </Badge>
+          )}
+          {isGeneratingImage && (
+            <Badge variant="outline" className="text-xs gap-1 text-green-600">
+              <ImageIcon size={10} /> 이미지 생성 중...
+            </Badge>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleGenerate}
+            disabled={!hasBaseArticle || isGenerating}
+            size="sm"
+            className="gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+          >
+            <Sparkles size={14} /> AI 생성
+          </Button>
+          {isGenerating && (
+            <Button variant="destructive" size="sm" onClick={abort}>중단</Button>
+          )}
+          <Button
+            onClick={handleGenerateAllImages}
+            disabled={cards.length === 0 || isGeneratingImage}
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+          >
+            {isGeneratingImage ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
+            전체 이미지
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPreview(true)}
+            disabled={cards.length === 0}
+            className="gap-1.5"
+          >
+            <Eye size={14} /> 미리보기
+          </Button>
+        </div>
+      </div>
+
+      {/* No base article */}
+      {!hasBaseArticle && (
+        <p className="text-sm text-muted-foreground">
+          기본 글을 먼저 작성해 주세요.
+        </p>
+      )}
+
+      {/* SEO Section */}
+      {hasBaseArticle && (
+        <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+          <h3 className="text-xs font-semibold">SEO 설정</h3>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">SEO 타이틀</label>
+            <Input
+              value={seoTitle}
+              onChange={(e) => handleSeoTitleChange(e.target.value)}
+              placeholder="검색에 노출될 블로그 제목..."
+              maxLength={100}
+              className="text-sm"
+            />
+            <p className="text-xs text-muted-foreground mt-1">{seoTitle.length}/100자</p>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">주요 키워드</label>
+            <Input
+              value={primaryKeyword}
+              onChange={(e) => handlePrimaryKeywordChange(e.target.value)}
+              placeholder="메인 검색 키워드"
+              className="text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">보조 키워드</label>
+            <div className="flex gap-2 mb-2">
+              <Input
+                value={newKeywordInput}
+                onChange={(e) => setNewKeywordInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSecondaryKeyword(); } }}
+                placeholder="보조 키워드 입력 후 Enter"
+                className="flex-1 text-sm"
+              />
+              <Button variant="outline" size="sm" onClick={handleAddSecondaryKeyword}>
+                <Plus size={14} />
+              </Button>
+            </div>
+            {secondaryKeywords.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {secondaryKeywords.map((kw) => (
+                  <Badge key={kw} variant="secondary" className="text-xs gap-1 pr-1">
+                    {kw}
+                    <button onClick={() => handleRemoveSecondaryKeyword(kw)} className="hover:text-destructive ml-0.5">
+                      <X size={10} />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+          <NaverKeywordPanel
+            primaryKeyword={primaryKeyword}
+            secondaryKeywords={secondaryKeywords}
+            onSetPrimary={(kw) => handlePrimaryKeywordChange(kw)}
+            onAddSecondary={(kw) => {
+              const updated = [...secondaryKeywords, kw];
+              setSecondaryKeywords(updated);
+              saveKeywords(primaryKeyword, updated);
+            }}
+          />
+          {cards.length > 0 && (
+            <SeoScoreDisplay score={seoResult.score} details={seoResult.details} />
+          )}
+        </div>
+      )}
+
+      {/* Card List */}
+      {cards.length > 0 && (
+        <div className="space-y-4">
+          {cards.map((card, i) => (
+            <BlogCardItem
+              key={card.id}
+              card={card}
+              index={i}
+              onUpdate={handleCardUpdate}
+              onDelete={handleCardDelete}
+              onGenerateImage={handleGenerateCardImage}
+              isGeneratingImage={isGeneratingImage}
+              generatingCardId={generatingCardId}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Add Section */}
+      {hasBaseArticle && <AddCardButton onAdd={handleAddSection} />}
+
+      {/* Prompt Dialog */}
+      <PromptEditDialog
+        open={showPromptDialog}
+        onOpenChange={setShowPromptDialog}
+        initialPrompt={generatedPrompt}
+        isGenerating={isGenerating}
+        onGenerate={handleStartGeneration}
+        onAbort={abort}
+      />
+
+      {/* Preview Dialog */}
+      <BlogPreviewDialog
+        open={showPreview}
+        onOpenChange={setShowPreview}
+        cards={cards}
+        seoTitle={seoTitle}
+      />
+    </div>
+  );
+}
+
+// ─── Outer: 다중 블로그 콘텐츠 리스트 ────────────────────────────
+
+export function BlogPanel() {
+  const { selectedContentId, contents, selectedProjectId, projects, getBaseArticle, getBlogContents, addBlogContent, updateBlogContent, deleteBlogContent, getChannelModels, setChannelModels } = useProjectStore();
+  const content = contents.find((c) => c.id === selectedContentId);
+  const project = projects.find((p) => p.id === selectedProjectId);
+  if (!content || !project) return null;
+  const hasBaseArticle = !!getBaseArticle(content.id);
+  const blogContents = getBlogContents(content.id);
+  const channelModels = getChannelModels(project.id, 'blog');
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold">블로그 (네이버)</h2>
+      </div>
+
+      {/* Model Selector + Image Settings */}
+      <ChannelModelSelector
+        textModel={channelModels.textModel}
+        imageModel={channelModels.imageModel}
+        onTextModelChange={(m) => setChannelModels(project.id, 'blog', { textModel: m })}
+        onImageModelChange={(m) => setChannelModels(project.id, 'blog', { imageModel: m })}
+        aspectRatio={channelModels.aspectRatio}
+        onAspectRatioChange={(r) => setChannelModels(project.id, 'blog', { aspectRatio: r })}
+        imageStyle={channelModels.imageStyle}
+        onImageStyleChange={(s) => setChannelModels(project.id, 'blog', { imageStyle: s })}
+        defaultAspectRatio="16:9"
+      />
+
+      {/* Content List */}
+      <ChannelContentList<BlogContent>
+        items={blogContents}
+        getId={(item) => item.id}
+        getTitle={(item, index) => item.title || `블로그 글 ${index + 1}`}
+        onTitleChange={(id, title) => updateBlogContent(id, { title })}
+        onAdd={() => addBlogContent(content.id)}
+        onDelete={(id) => deleteBlogContent(id)}
+        addLabel="새 블로그 글 추가"
+        renderContent={(blogContent) => (
+          <BlogPanelInner
+            key={blogContent.id}
+            blogContent={blogContent}
+            content={content}
+            project={project}
+            hasBaseArticle={hasBaseArticle}
+            channelModels={channelModels}
+          />
+        )}
+      />
+    </div>
+  );
+}
