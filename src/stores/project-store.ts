@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import type { Project, Content, ContentStatus, BaseArticle, BlogContent, BlogCard, InstagramContent, InstagramCard, ThreadsContent, ThreadsCard, YoutubeContent, YoutubeCard } from '@/types/database';
+import type { MarketingStrategy, StrategyInput, GenerationStatus, StrategyTab } from '@/types/strategy';
 import { generateId } from '@/lib/utils';
 
 // IndexedDB storage adapter (localStorage 5MB 제한 해결)
@@ -117,6 +118,14 @@ interface ProjectState {
   deleteYoutubeCard: (cardId: string) => void;
   reorderYoutubeCards: (youtubeContentId: string, cardIds: string[]) => void;
 
+  // Strategy
+  strategies: MarketingStrategy[];
+  getStrategy: (projectId: string) => MarketingStrategy | undefined;
+  createOrUpdateStrategy: (projectId: string, input: StrategyInput) => string;
+  updateStrategyTab: (strategyId: string, tab: StrategyTab, data: unknown) => void;
+  updateStrategyStatus: (strategyId: string, status: Partial<GenerationStatus>) => void;
+  deleteStrategy: (projectId: string) => void;
+
   // Channel model helpers
   getChannelModels: (projectId: string, channel: string) => { textModel: string; imageModel: string; aspectRatio: string; imageStyle: string };
   setChannelModels: (projectId: string, channel: string, models: { textModel?: string; imageModel?: string; aspectRatio?: string; imageStyle?: string }) => void;
@@ -144,6 +153,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
   threadsCards: [],
   youtubeContents: [],
   youtubeCards: [],
+  strategies: [],
   sidebarCollapsed: false,
   showProjectSettings: false,
   searchQuery: '',
@@ -366,6 +376,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
       threadsCards: state.threadsCards.filter((card) => !thContentIds.includes(card.threads_content_id)),
       youtubeContents: state.youtubeContents.filter((yc) => !contentIds.includes(yc.content_id)),
       youtubeCards: state.youtubeCards.filter((card) => !ytContentIds.includes(card.youtube_content_id)),
+      strategies: state.strategies.filter((s) => s.projectId !== projectId),
       selectedProjectId: state.selectedProjectId === projectId ? null : state.selectedProjectId,
       selectedContentId:
         state.contents.find((c) => c.id === state.selectedContentId)?.project_id === projectId
@@ -919,6 +930,94 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
     }));
   },
 
+  // ====== Strategy ======
+  getStrategy: (projectId) => {
+    return get().strategies.find((s) => s.projectId === projectId);
+  },
+
+  createOrUpdateStrategy: (projectId, input) => {
+    const existing = get().strategies.find((s) => s.projectId === projectId);
+    const now = new Date().toISOString();
+
+    if (existing) {
+      set((state) => ({
+        strategies: state.strategies.map((s) =>
+          s.projectId === projectId
+            ? { ...s, input, updatedAt: now, overview: null, keywords: null, channelStrategy: null, contentStrategy: null, kpiAction: null, generationStatus: { overall: 'idle', tabs: { overview: { status: 'idle' }, keywords: { status: 'idle' }, channelStrategy: { status: 'idle' }, contentStrategy: { status: 'idle' }, kpiAction: { status: 'idle' } } } }
+            : s
+        ),
+      }));
+      return existing.id;
+    }
+
+    const id = generateId('strategy');
+    const newStrategy: MarketingStrategy = {
+      id,
+      projectId,
+      createdAt: now,
+      updatedAt: now,
+      input,
+      overview: null,
+      keywords: null,
+      channelStrategy: null,
+      contentStrategy: null,
+      kpiAction: null,
+      generationStatus: {
+        overall: 'idle',
+        tabs: {
+          overview: { status: 'idle' },
+          keywords: { status: 'idle' },
+          channelStrategy: { status: 'idle' },
+          contentStrategy: { status: 'idle' },
+          kpiAction: { status: 'idle' },
+        },
+      },
+    };
+    set((state) => ({ strategies: [...state.strategies, newStrategy] }));
+    return id;
+  },
+
+  updateStrategyTab: (strategyId, tab, data) => {
+    set((state) => ({
+      strategies: state.strategies.map((s) =>
+        s.id === strategyId
+          ? {
+              ...s,
+              [tab]: data,
+              updatedAt: new Date().toISOString(),
+              generationStatus: {
+                ...s.generationStatus,
+                tabs: { ...s.generationStatus.tabs, [tab]: { status: 'complete' } },
+              },
+            }
+          : s
+      ),
+    }));
+  },
+
+  updateStrategyStatus: (strategyId, status) => {
+    set((state) => ({
+      strategies: state.strategies.map((s) =>
+        s.id === strategyId
+          ? {
+              ...s,
+              generationStatus: {
+                ...s.generationStatus,
+                ...status,
+                tabs: { ...s.generationStatus.tabs, ...(status.tabs || {}) },
+              },
+            }
+          : s
+      ),
+    }));
+  },
+
+  deleteStrategy: (projectId) => {
+    set((state) => ({
+      strategies: state.strategies.filter((s) => s.projectId !== projectId),
+    }));
+  },
+
   // Channel model helpers
   getChannelModels: (projectId, channel) => {
     const project = get().projects.find((p) => p.id === projectId);
@@ -973,6 +1072,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
     threadsCards: state.threadsCards,
     youtubeContents: state.youtubeContents,
     youtubeCards: state.youtubeCards,
+    strategies: state.strategies,
     selectedProjectId: state.selectedProjectId,
     selectedContentId: state.selectedContentId,
   }),
