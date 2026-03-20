@@ -339,6 +339,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
 - 화면 디렉션 없는 나레이션만 작성
 - CTA 빠뜨리기
 - 한 섹션이 3분 이상 길어지기`,
+      api_keys: null,
       reference_files: null,
       bgm_files: null,
       sort_order: get().projects.length,

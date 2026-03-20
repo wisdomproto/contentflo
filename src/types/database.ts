@@ -39,6 +39,39 @@ export interface BgmFile {
   added_at: string;
 }
 
+// --- API Keys ---
+
+export interface ProjectApiKeys {
+  naver?: {
+    licenseKey: string;
+    secretKey: string;
+    customerId: string;
+  };
+  naverDatalab?: {
+    clientId: string;
+    clientSecret: string;
+  };
+  instagram?: {
+    appId: string;
+    appSecret: string;
+    accessToken: string;
+  };
+  threads?: {
+    appId: string;
+    appSecret: string;
+    accessToken: string;
+  };
+  youtube?: {
+    apiKey: string;
+    clientId: string;
+    clientSecret: string;
+    refreshToken: string;
+  };
+  perplexity?: {
+    apiKey: string;
+  };
+}
+
 // --- Core Tables ---
 
 export interface User {
@@ -84,6 +117,8 @@ export interface Project {
   writing_guide_instagram: string | null;
   writing_guide_threads: string | null;
   writing_guide_youtube: string | null;
+  // API 키 (채널별)
+  api_keys: ProjectApiKeys | null;
   // 참고 자료 (프로젝트 기본)
   reference_files: ReferenceFile[] | null;
   bgm_files: BgmFile[] | null;

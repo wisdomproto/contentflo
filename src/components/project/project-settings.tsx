@@ -4,9 +4,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { WritingGuideSection } from './writing-guide-section';
 import { ReferenceFilesSection } from './reference-files-section';
 import { BgmSection } from './bgm-section';
+import { ApiKeysSection } from './api-keys-section';
 import { useProjectStore } from '@/stores/project-store';
 import type { Project } from '@/types/database';
-import { FileText, Paperclip, Music } from 'lucide-react';
+import { FileText, Paperclip, Music, Key } from 'lucide-react';
 
 interface ProjectSettingsProps {
   project: Project;
@@ -38,6 +39,9 @@ export function ProjectSettings({ project }: ProjectSettingsProps) {
             <TabsTrigger value="bgm">
               <Music size={14} className="mr-1.5" /> BGM
             </TabsTrigger>
+            <TabsTrigger value="api-keys">
+              <Key size={14} className="mr-1.5" /> API 키
+            </TabsTrigger>
           </TabsList>
 
           <div className="mt-6">
@@ -49,6 +53,9 @@ export function ProjectSettings({ project }: ProjectSettingsProps) {
             </TabsContent>
             <TabsContent value="bgm">
               <BgmSection project={project} onUpdate={handleUpdate} />
+            </TabsContent>
+            <TabsContent value="api-keys">
+              <ApiKeysSection project={project} onUpdate={handleUpdate} />
             </TabsContent>
           </div>
         </Tabs>
