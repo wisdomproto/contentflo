@@ -37,7 +37,7 @@ export function KeywordTab({ data, naverKeywords, onRegenerate }: KeywordTabProp
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white dark:bg-card border rounded-xl p-3"><div className="text-2xl font-black">{items.length}</div><div className="text-xs text-muted-foreground">분석 키워드</div></div>
         <div className="bg-white dark:bg-card border rounded-xl p-3"><div className="text-2xl font-black text-red-600">{items.filter((k) => k.totalSearch >= 2000).length}</div><div className="text-xs text-muted-foreground">고볼륨 2000+</div></div>
-        <div className="bg-white dark:bg-card border rounded-xl p-3"><div className="text-2xl font-black text-emerald-600">{data?.goldenKeywords.length || 0}</div><div className="text-xs text-muted-foreground">황금 키워드</div></div>
+        <div className="bg-white dark:bg-card border rounded-xl p-3"><div className="text-2xl font-black text-emerald-600">{data?.goldenKeywords?.length || 0}</div><div className="text-xs text-muted-foreground">황금 키워드</div></div>
         <div className="bg-white dark:bg-card border rounded-xl p-3"><div className="text-2xl font-black">{items.length ? Math.round(items.reduce((s, k) => s + k.mobileRatio, 0) / items.length) : 0}%</div><div className="text-xs text-muted-foreground">평균 모바일 비중</div></div>
       </div>
 
