@@ -28,14 +28,20 @@ src/
 ├── app/                    # Next.js App Router
 │   ├── dashboard/          # 메인 대시보드
 │   └── api/
-│       ├── ai/generate/         # 텍스트 AI 생성 (SSE 스트리밍)
-│       ├── ai/generate-image/   # 이미지 AI 생성
-│       └── naver/keywords/      # 네이버 키워드 검색
+│       ├── ai/generate/              # 텍스트 AI 생성 (SSE 스트리밍)
+│       ├── ai/generate-image/        # 이미지 AI 생성
+│       ├── ai/strategy/generate/     # 마케팅 전략 전체 생성 (SSE)
+│       ├── ai/strategy/regenerate/   # 마케팅 전략 탭별 재생성 (SSE)
+│       ├── ai/strategy/crawl/        # URL 크롤링 분석 (cheerio)
+│       ├── ai/strategy/suggest-keywords/    # AI 키워드 추천
+│       ├── ai/strategy/suggest-competitors/ # AI 경쟁사 탐색
+│       ├── naver/keywords/           # 네이버 키워드 검색
+│       └── naver/keywords/trend/     # 네이버 DataLab 트렌드
 ├── components/
 │   ├── content/            # 채널별 패널 (핵심)
 │   │   ├── content-tabs.tsx           # 탭 네비게이션
 │   │   ├── base-article-panel.tsx     # 기본글 에디터 (TipTap)
-│   │   ├── blog-panel.tsx             # 블로그 (네이버) — Outer+Inner 패턴
+│   │   ├── blog-panel.tsx             # 블로그 (네이버) — Outer+Inner + 전략 키워드 배너
 │   │   ├── blog-card-item.tsx         # 블로그 카드 컴포넌트
 │   │   ├── blog-preview-dialog.tsx    # 블로그 미리보기
 │   │   ├── cardnews-panel.tsx         # 카드뉴스 (인스타그램) — Outer+Inner 패턴
@@ -54,34 +60,53 @@ src/
 │   │   ├── content-settings.tsx       # 설정 탭
 │   │   ├── prompt-edit-dialog.tsx     # 프롬프트 미리보기/수정
 │   │   └── topic-suggestion-dialog.tsx # AI 주제 추천
+│   ├── strategy/            # AI 마케팅 전략
+│   │   ├── strategy-dashboard.tsx     # 대시보드 래퍼 (입력폼/히어로/탭/콘텐츠)
+│   │   ├── strategy-input-form.tsx    # 6필드 입력폼 + AI 키워드/경쟁사 추천
+│   │   ├── strategy-hero.tsx          # 히어로 통계 배너
+│   │   ├── strategy-tabs.tsx          # 5탭 네비게이션
+│   │   ├── overview-tab.tsx           # ① 개요·경쟁사
+│   │   ├── keyword-tab.tsx            # ② 키워드 분석
+│   │   ├── keyword-table.tsx          # 키워드 테이블 (정렬/필터)
+│   │   ├── channel-tab.tsx            # ③ 채널·퍼널 전략
+│   │   ├── content-tab.tsx            # ④ 콘텐츠·주제
+│   │   ├── topic-table.tsx            # 주제 목록 테이블 (필터)
+│   │   └── kpi-tab.tsx                # ⑤ KPI·액션플랜
 │   ├── editor/             # TipTap 에디터 + 툴바
 │   ├── project/            # 프로젝트 설정 (브랜드, 마케터, API키 등)
-│   ├── sidebar/            # 프로젝트 트리 사이드바
+│   ├── sidebar/            # 프로젝트 트리 사이드바 (마케팅 전략 고정 항목 포함)
 │   ├── layout/             # 헤더
 │   └── ui/                 # shadcn/ui 컴포넌트
 ├── stores/
-│   └── project-store.ts    # Zustand 메인 스토어 (IndexedDB 영속화)
+│   └── project-store.ts    # Zustand 메인 스토어 (IndexedDB 영속화, Strategy CRUD 포함)
 ├── hooks/
-│   ├── use-ai-generation.ts    # SSE 텍스트 스트리밍
-│   ├── use-image-generation.ts # 배치 이미지 생성 + progress
-│   ├── use-auto-save.ts        # 디바운스 자동저장
-│   └── use-hydration.ts        # SSR 하이드레이션 가드
+│   ├── use-ai-generation.ts         # SSE 텍스트 스트리밍
+│   ├── use-strategy-generation.ts   # 전략 생성 SSE 스트리밍 (멀티탭)
+│   ├── use-image-generation.ts      # 배치 이미지 생성 + progress
+│   ├── use-auto-save.ts             # 디바운스 자동저장
+│   └── use-hydration.ts             # SSR 하이드레이션 가드
 ├── lib/
-│   ├── prompt-builder.ts   # 채널별 프롬프트 빌더 (433줄)
-│   ├── seo-scorer.ts       # 네이버 SEO 점수 계산
-│   ├── utils.ts            # generateId, countWords, cn
-│   └── ai/                 # 이미지 생성 서비스 (Strategy Pattern)
+│   ├── prompt-builder.ts            # 채널별 프롬프트 빌더 (433줄)
+│   ├── strategy-prompt-builder.ts   # 전략 5탭 프롬프트 빌더
+│   ├── seo-scorer.ts                # 네이버 SEO 점수 계산
+│   ├── utils.ts                     # generateId, countWords, cn
+│   └── ai/                          # 이미지 생성 서비스 (Strategy Pattern)
 ├── test/
 │   └── setup.ts            # Vitest 테스트 셋업 (@testing-library/jest-dom)
 ├── types/
-│   └── database.ts         # 전체 TypeScript 인터페이스
+│   ├── database.ts         # 전체 TypeScript 인터페이스 (ProjectApiKeys 포함)
+│   └── strategy.ts         # 마케팅 전략 타입 (27개 인터페이스)
 └── data/
     └── mock-data.ts        # (빈 파일 — Zustand 직접 관리)
 ```
 
 ## 데이터 모델 (3-tier, 1:N 관계)
 ```
-Project (프로젝트 설정)
+Project (프로젝트 설정 + API 키)
+ ├── MarketingStrategy (1:1, AI 마케팅 전략)
+ │    ├── input: StrategyInput
+ │    ├── overview / keywords / channelStrategy / contentStrategy / kpiAction
+ │    └── generationStatus (탭별 생성 상태)
  └── Content (콘텐츠 메타데이터)
       ├── BaseArticle (기본 글 본문, 1:1)
       ├── BlogContent[] (1:N) → BlogCard[]
@@ -97,10 +122,30 @@ Project (프로젝트 설정)
 
 ## 채널 구현 상태
 - [x] 기본글 (BaseArticle) — TipTap 에디터, AI 주제 추천, 글 생성
-- [x] 블로그 (네이버) — SEO 설정, 카드 에디터, AI 생성, 이미지 생성, 미리보기
+- [x] 블로그 (네이버) — SEO 설정, 카드 에디터, AI 생성, 이미지 생성, 미리보기, 전략 키워드 배너
 - [x] 카드뉴스 (인스타그램) — 캡션/해시태그, 슬라이드 에디터, 참조 이미지, AI 2단계 생성, 전체 다운로드
 - [x] 스레드 — 멀티포스트, AI 생성, 이미지 생성, 미리보기, 전체 복사
 - [x] 유튜브 — Vrew 스타일 3단 UI (프리뷰+스크립트 편집+타임라인), 씬별 이미지 생성, 대본 생성, 미리보기, 전체 복사
+
+## AI 마케팅 전략
+프로젝트별 통합 마케팅 전략 수립 기능. 사이드바에서 프로젝트 아래 "마케팅 전략" 고정 항목으로 접근.
+
+### 입력
+- 타겟 URL (AI 크롤링 분석) + 비즈니스 정보 + 키워드 시드 + 경쟁사 + 예산/인력
+- AI 키워드 추천 (업종+URL 기반 15~20개 자동 추천)
+- AI 경쟁사 탐색 (업종 기반 5~8개 자동 발견)
+- 기존 프로젝트 설정 자동 연동
+
+### 5탭 대시보드
+1. **개요·경쟁사** — 비즈니스 요약, 차별화 카드, 문제점/기회, 경쟁사 분석
+2. **키워드 분석** — 네이버 API 실데이터 + AI 황금키워드 추천 + 인사이트
+3. **채널·퍼널** — 유입 퍼널, 채널별 전략, 주간 스케줄, 역할 분배
+4. **콘텐츠·주제** — 카테고리 순환, 50~100개 주제 자동 생성, "콘텐츠 만들기" 연동
+5. **KPI·액션** — 채널별 KPI, 우선순위 액션플랜, 예산 배분
+
+### 생성 방식
+- 전체 생성 (5탭 순차 SSE) + 탭별 재생성 (수정 지시 입력)
+- 네이버 API → URL 크롤링 → AI 순차 생성
 
 ## Outer+Inner 패널 패턴
 모든 채널 패널은 동일한 구조:
@@ -159,6 +204,7 @@ ChannelPanel (Outer)
 - **BaseArticle**: createOrUpdate (1:1 관계이므로 upsert)
 - **채널 콘텐츠**: add/update/delete/getPlural (1:N 관계)
 - **카드**: add/update/delete/reorder + setForContent (벌크 교체)
+- **Strategy**: createOrUpdate/updateTab/updateStatus/delete (1:1, cascade delete)
 
 ## 개발 컨벤션
 - 한국어 UI, 코드 주석은 필요시 한국어
@@ -170,6 +216,9 @@ ChannelPanel (Outer)
 
 ## 환경변수
 - `GEMINI_API_KEY`: Gemini API 키 (.env.local)
+- `NAVER_DATALAB_CLIENT_ID`: 네이버 DataLab Client ID (선택)
+- `NAVER_DATALAB_CLIENT_SECRET`: 네이버 DataLab Client Secret (선택)
+- 네이버 검색광고 / Instagram / Threads / YouTube / Perplexity 키: 프로젝트 설정 > API 키 탭에서 관리
 
 ## 미구현/스텁 목록
 - `/api/ai/factcheck`, `/api/ai/tts` — 스텁 라우트

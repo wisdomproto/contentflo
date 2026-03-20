@@ -59,6 +59,22 @@
 - [x] 모든 채널 패널 Outer+Inner 패턴 리팩토링
 - [x] 채널별 모델 선택기 (패널 레벨 공유)
 
+## Phase 7.8: AI 마케팅 전략 ✅ 완료
+- [x] MarketingStrategy 타입 정의 (27개 인터페이스)
+- [x] Zustand Store 확장 (Strategy CRUD + cascade delete + IndexedDB 영속화)
+- [x] URL 크롤링 API (cheerio, 최대 5개 URL, 10초 타임아웃)
+- [x] 네이버 DataLab 트렌드 API (12개월 검색 추이)
+- [x] 전략 프롬프트 빌더 (5탭 × JSON 구조 요청)
+- [x] 전략 생성/재생성 SSE API (Gemini, 탭별 순차 생성)
+- [x] 전략 생성 훅 (useStrategyGeneration, 멀티탭 SSE)
+- [x] 입력 폼 (6필드 + 프로젝트 설정 자동 채움)
+- [x] AI 키워드 추천 (업종+URL 기반 15~20개)
+- [x] AI 경쟁사 자동 탐색 (업종 기반 5~8개)
+- [x] 5탭 대시보드 UI (개요·경쟁사 / 키워드 / 채널·퍼널 / 콘텐츠·주제 / KPI·액션)
+- [x] 사이드바 프로젝트별 "마케팅 전략" 고정 항목
+- [x] 블로그 패널 황금 키워드 배너 연동
+- [x] 프로젝트 설정 API 키 탭 (네이버/DataLab/인스타/스레드/유튜브/Perplexity + 도움말 툴팁)
+
 ---
 
 ## 다음 단계 (미구현)
