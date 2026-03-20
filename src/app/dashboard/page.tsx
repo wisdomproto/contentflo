@@ -24,7 +24,12 @@ function EmptyState() {
 }
 
 export default function DashboardPage() {
-  const { selectedProjectId, selectedContentId, showProjectSettings, showStrategy, projects } = useProjectStore();
+  // Subscribe to each value individually for proper reactivity
+  const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
+  const selectedContentId = useProjectStore((s) => s.selectedContentId);
+  const showProjectSettings = useProjectStore((s) => s.showProjectSettings);
+  const showStrategy = useProjectStore((s) => s.showStrategy);
+  const projects = useProjectStore((s) => s.projects);
 
   if (!selectedProjectId) {
     return <EmptyState />;
