@@ -106,7 +106,11 @@ export function StrategyDashboard() {
 
   // Show input form if no strategy exists
   if (!strategy || strategy.generationStatus.overall === 'idle') {
-    return <StrategyInputForm onSubmit={handleSubmit} isGenerating={isGenerating} />;
+    return (
+      <div className="flex-1 overflow-y-auto">
+        <StrategyInputForm onSubmit={handleSubmit} isGenerating={isGenerating} />
+      </div>
+    );
   }
 
   const defaultTabStatus = { status: 'idle' as const };
