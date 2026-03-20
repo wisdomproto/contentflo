@@ -19,9 +19,10 @@ interface KeywordTabProps {
 export function KeywordTab({ data, naverKeywords, onRegenerate }: KeywordTabProps) {
   const [instruction, setInstruction] = useState('');
 
-  if (!data && naverKeywords.length === 0) return <div className="text-center text-muted-foreground py-16">데이터 없음</div>;
+  const kw = naverKeywords || [];
+  if (!data && kw.length === 0) return <div className="text-center text-muted-foreground py-16">데이터 없음</div>;
 
-  const items = data ? data.items : naverKeywords;
+  const items = (data?.items?.length ? data.items : kw) || [];
 
   return (
     <div className="space-y-8">
