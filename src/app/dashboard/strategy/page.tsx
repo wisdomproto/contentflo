@@ -1,7 +1,12 @@
 'use client';
 
-import { StrategyDashboard } from '@/components/strategy/strategy-dashboard';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function StrategyPage() {
-  return <StrategyDashboard />;
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/dashboard');
+  }, [router]);
+  return null;
 }
