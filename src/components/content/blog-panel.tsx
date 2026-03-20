@@ -72,6 +72,12 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
     addBlogCard,
   } = useProjectStore();
 
+  // Get strategy for keyword recommendations
+  const strategy = useProjectStore((s) => {
+    const projectId = s.selectedProjectId;
+    return projectId ? s.getStrategy(projectId) : undefined;
+  });
+
   const baseArticle = getBaseArticle(content.id);
   const cards = getBlogCards(blogContent.id);
 
@@ -288,6 +294,24 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
 
   return (
     <div className="space-y-4">
+      {/* Golden keyword banner from marketing strategy */}
+      {strategy?.keywords?.goldenKeywords && strategy.keywords.goldenKeywords.length > 0 && (
+        <div className="mb-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+          <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">🥇 추천 키워드 (마케팅 전략)</div>
+          <div className="flex gap-2 flex-wrap">
+            {strategy.keywords.goldenKeywords.slice(0, 3).map((gk) => (
+              <button
+                key={gk.keyword}
+                onClick={() => handlePrimaryKeywordChange(gk.keyword)}
+                className="text-xs px-2 py-1 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 rounded hover:bg-emerald-200 dark:hover:bg-emerald-800 transition-colors"
+              >
+                {gk.keyword} ({gk.totalSearch.toLocaleString()}/월)
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Action buttons */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
