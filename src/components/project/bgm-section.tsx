@@ -23,42 +23,80 @@ export function BgmSection({ project, onUpdate }: BgmSectionProps) {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioUrlsRef = useRef<Map<string, string>>(new Map());
   const files: BgmFile[] = project.bgm_files ?? [];
 
-  const addFiles = useCallback((fileList: FileList) => {
+  const addFiles = useCallback(async (fileList: FileList) => {
     const audioFiles = Array.from(fileList).filter((f) =>
       f.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(f.name)
     );
     if (audioFiles.length === 0) return;
 
-    const newFiles: BgmFile[] = audioFiles.map((f) => {
+    const newFiles: BgmFile[] = [];
+
+    for (const f of audioFiles) {
       const id = generateId('bgm');
-      const url = URL.createObjectURL(f);
-      audioUrlsRef.current.set(id, url);
-      return {
+      const fileEntry: BgmFile = {
         id,
         name: f.name,
         size: f.size,
         type: f.type || 'audio/mpeg',
         duration: null,
+        added_at: new Date().toISOString(),
         url: null,
         r2_key: null,
-        added_at: new Date().toISOString(),
       };
-    });
-    onUpdate({ bgm_files: [...files, ...newFiles] });
-  }, [files, onUpdate]);
 
-  const removeFile = (fileId: string) => {
+      try {
+        const presignRes = await fetch('/api/storage/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: project.id,
+            category: 'bgm',
+            fileName: f.name,
+            contentType: f.type || 'audio/mpeg',
+            contentId: id,
+          }),
+        });
+
+        if (presignRes.ok) {
+          const { presignedUrl, publicUrl, key } = await presignRes.json();
+          const uploadRes = await fetch(presignedUrl, {
+            method: 'PUT',
+            body: f,
+            headers: { 'Content-Type': f.type || 'audio/mpeg' },
+          });
+          if (uploadRes.ok) {
+            fileEntry.url = publicUrl;
+            fileEntry.r2_key = key;
+          }
+        }
+      } catch {
+        // Upload failed
+      }
+
+      newFiles.push(fileEntry);
+    }
+
+    onUpdate({ bgm_files: [...files, ...newFiles] });
+  }, [files, onUpdate, project.id]);
+
+  const removeFile = async (fileId: string) => {
     if (playingId === fileId) {
       audioRef.current?.pause();
       setPlayingId(null);
     }
-    const url = audioUrlsRef.current.get(fileId);
-    if (url) {
-      URL.revokeObjectURL(url);
-      audioUrlsRef.current.delete(fileId);
+    const file = files.find((f) => f.id === fileId);
+    if (file?.r2_key) {
+      try {
+        await fetch('/api/storage/delete', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keys: [file.r2_key] }),
+        });
+      } catch {
+        // Non-blocking
+      }
     }
     const updated = files.filter((f) => f.id !== fileId);
     onUpdate({ bgm_files: updated.length > 0 ? updated : null });
@@ -70,11 +108,11 @@ export function BgmSection({ project, onUpdate }: BgmSectionProps) {
       setPlayingId(null);
       return;
     }
-    const url = audioUrlsRef.current.get(fileId);
-    if (!url) return;
+    const file = files.find((f) => f.id === fileId);
+    if (!file?.url) return;
 
     if (audioRef.current) audioRef.current.pause();
-    const audio = new Audio(url);
+    const audio = new Audio(file.url);
     audio.onended = () => setPlayingId(null);
     audio.play();
     audioRef.current = audio;
