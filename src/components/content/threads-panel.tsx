@@ -94,6 +94,7 @@ function ThreadsPanelInner({ threadsContent, content, project, hasBaseArticle, c
     imageModel: channelModels.imageModel,
     aspectRatio: channelModels.aspectRatio || '1:1',
     imageStyle: channelModels.imageStyle,
+    projectId: project.id,
   });
 
   const handleGenerateCardImage = (cardId: string) => generateCardImage(cardId, cards);

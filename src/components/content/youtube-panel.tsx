@@ -137,6 +137,7 @@ function YoutubePanelInner({ youtubeContent, content, project, hasBaseArticle, c
     imageModel: channelModels.imageModel,
     aspectRatio: channelModels.aspectRatio || '16:9',
     imageStyle: channelModels.imageStyle,
+    projectId: project.id,
   });
 
   const handleGenerateCardImage = (cardId: string) => generateCardImage(cardId, cards);

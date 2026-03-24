@@ -247,6 +247,7 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
     imageModel: channelModels.imageModel,
     aspectRatio: channelModels.aspectRatio || '16:9',
     imageStyle: channelModels.imageStyle,
+    projectId: project.id,
   });
 
   const handleGenerateCardImage = (cardId: string) => generateCardImage(cardId, cards);

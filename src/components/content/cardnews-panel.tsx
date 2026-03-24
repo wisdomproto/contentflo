@@ -160,6 +160,7 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
     aspectRatio: channelModels.aspectRatio || '1:1',
     imageStyle: imageStyle,
     referenceImage: referenceImage || undefined,
+    projectId: project.id,
   });
 
   const handleGenerateCardImage = (cardId: string) => generateSingleCardImage(cardId, cards);

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useImageGeneration, type ImageGenerationProgress } from './use-image-generation';
+import { base64ToBlob } from './use-r2-upload';
 import type { AspectRatio } from '@/lib/ai/types';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -23,6 +24,8 @@ export interface CardImageConfig {
   imageStyle: string;
   /** 패널 레벨 참조 이미지 (카드뉴스 등) */
   referenceImage?: string;
+  /** R2 업로드 경로 구성을 위한 프로젝트 ID */
+  projectId: string;
 }
 
 export interface UseCardImageGenerationReturn {
@@ -65,8 +68,35 @@ export function useCardImageGeneration(config: CardImageConfig): UseCardImageGen
           cfg.imageModel
         );
         if (results[0]) {
-          const dataUrl = `data:${results[0].mimeType};base64,${results[0].base64}`;
-          cfg.saveResult(cardId, dataUrl, prompt);
+          const blob = base64ToBlob(results[0].base64, results[0].mimeType);
+          let savedUrl: string;
+          try {
+            const presignRes = await fetch('/api/storage/presign', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                projectId: cfg.projectId,
+                category: 'images',
+                fileName: `${cardId}.${results[0].mimeType.split('/')[1] || 'png'}`,
+                contentType: results[0].mimeType,
+                contentId: cardId,
+              }),
+            });
+            if (presignRes.ok) {
+              const { presignedUrl, publicUrl } = await presignRes.json();
+              const uploadRes = await fetch(presignedUrl, {
+                method: 'PUT',
+                body: blob,
+                headers: { 'Content-Type': results[0].mimeType },
+              });
+              savedUrl = uploadRes.ok ? publicUrl : `data:${results[0].mimeType};base64,${results[0].base64}`;
+            } else {
+              savedUrl = `data:${results[0].mimeType};base64,${results[0].base64}`;
+            }
+          } catch {
+            savedUrl = `data:${results[0].mimeType};base64,${results[0].base64}`;
+          }
+          cfg.saveResult(cardId, savedUrl, prompt);
         }
       } catch (err) {
         alert(`이미지 생성 오류: ${(err as Error).message}`);
