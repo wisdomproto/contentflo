@@ -29,20 +29,70 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
   const fileInputRef = useRef<HTMLInputElement>(null);
   const files: ReferenceFile[] = project.reference_files ?? [];
 
-  const addFiles = useCallback((fileList: FileList) => {
-    const newFiles: ReferenceFile[] = Array.from(fileList).map((f) => ({
-      id: generateId('ref'),
-      name: f.name,
-      size: f.size,
-      type: f.type || 'application/octet-stream',
-      url: null,
-      r2_key: null,
-      added_at: new Date().toISOString(),
-    }));
-    onUpdate({ reference_files: [...files, ...newFiles] });
-  }, [files, onUpdate]);
+  const addFiles = useCallback(async (fileList: FileList) => {
+    const newFiles: ReferenceFile[] = [];
 
-  const removeFile = (fileId: string) => {
+    for (const f of Array.from(fileList)) {
+      const id = generateId('ref');
+      const fileEntry: ReferenceFile = {
+        id,
+        name: f.name,
+        size: f.size,
+        type: f.type || 'application/octet-stream',
+        added_at: new Date().toISOString(),
+        url: null,
+        r2_key: null,
+      };
+
+      // Upload to R2
+      try {
+        const presignRes = await fetch('/api/storage/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: project.id,
+            category: 'references',
+            fileName: f.name,
+            contentType: f.type || 'application/octet-stream',
+            contentId: id,
+          }),
+        });
+
+        if (presignRes.ok) {
+          const { presignedUrl, publicUrl, key } = await presignRes.json();
+          const uploadRes = await fetch(presignedUrl, {
+            method: 'PUT',
+            body: f,
+            headers: { 'Content-Type': f.type || 'application/octet-stream' },
+          });
+          if (uploadRes.ok) {
+            fileEntry.url = publicUrl;
+            fileEntry.r2_key = key;
+          }
+        }
+      } catch {
+        // Upload failed — file metadata saved without URL
+      }
+
+      newFiles.push(fileEntry);
+    }
+
+    onUpdate({ reference_files: [...files, ...newFiles] });
+  }, [files, onUpdate, project.id]);
+
+  const removeFile = async (fileId: string) => {
+    const file = files.find((f) => f.id === fileId);
+    if (file?.r2_key) {
+      try {
+        await fetch('/api/storage/delete', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keys: [file.r2_key] }),
+        });
+      } catch {
+        // Deletion failure is non-blocking
+      }
+    }
     const updated = files.filter((f) => f.id !== fileId);
     onUpdate({ reference_files: updated.length > 0 ? updated : null });
   };
