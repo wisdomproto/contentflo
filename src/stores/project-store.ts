@@ -390,6 +390,14 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
           : state.selectedContentId,
       showProjectSettings: state.selectedProjectId === projectId ? false : state.showProjectSettings,
     }));
+    // Async R2 cleanup (fire-and-forget)
+    fetch('/api/storage/delete-prefix', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefix: `${projectId}/` }),
+    }).catch(() => {
+      // R2 cleanup failure is non-blocking
+    });
   },
 
   duplicateProject: (projectId) => {
@@ -460,23 +468,67 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
   },
 
   deleteContent: (contentId) => {
-    const blogContentIds = get().blogContents.filter((bc) => bc.content_id === contentId).map((bc) => bc.id);
-    const igContentIds = get().instagramContents.filter((ic) => ic.content_id === contentId).map((ic) => ic.id);
-    const thContentIds = get().threadsContents.filter((tc) => tc.content_id === contentId).map((tc) => tc.id);
-    const ytContentIds = get().youtubeContents.filter((yc) => yc.content_id === contentId).map((yc) => yc.id);
-    set((state) => ({
-      contents: state.contents.filter((c) => c.id !== contentId),
-      baseArticles: state.baseArticles.filter((a) => a.content_id !== contentId),
-      blogContents: state.blogContents.filter((bc) => bc.content_id !== contentId),
-      blogCards: state.blogCards.filter((card) => !blogContentIds.includes(card.blog_content_id)),
-      instagramContents: state.instagramContents.filter((ic) => ic.content_id !== contentId),
-      instagramCards: state.instagramCards.filter((card) => !igContentIds.includes(card.instagram_content_id)),
-      threadsContents: state.threadsContents.filter((tc) => tc.content_id !== contentId),
-      threadsCards: state.threadsCards.filter((card) => !thContentIds.includes(card.threads_content_id)),
-      youtubeContents: state.youtubeContents.filter((yc) => yc.content_id !== contentId),
-      youtubeCards: state.youtubeCards.filter((card) => !ytContentIds.includes(card.youtube_content_id)),
-      selectedContentId: state.selectedContentId === contentId ? null : state.selectedContentId,
+    const state = get();
+    const blogContentIds = state.blogContents.filter((bc) => bc.content_id === contentId).map((bc) => bc.id);
+    const igContentIds = state.instagramContents.filter((ic) => ic.content_id === contentId).map((ic) => ic.id);
+    const thContentIds = state.threadsContents.filter((tc) => tc.content_id === contentId).map((tc) => tc.id);
+    const ytContentIds = state.youtubeContents.filter((yc) => yc.content_id === contentId).map((yc) => yc.id);
+
+    // Collect R2 image URLs from cards about to be deleted
+    const r2PublicUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || '';
+    const imageUrls: string[] = [];
+
+    // Blog cards: images may be in content field
+    state.blogCards
+      .filter((c) => blogContentIds.includes(c.blog_content_id))
+      .forEach((c) => {
+        const imgUrl = (c.content as Record<string, unknown>)?.image_url;
+        if (typeof imgUrl === 'string' && imgUrl.startsWith('http')) imageUrls.push(imgUrl);
+      });
+
+    // Instagram cards
+    state.instagramCards
+      .filter((c) => igContentIds.includes(c.instagram_content_id))
+      .forEach((c) => { if (c.background_image_url?.startsWith('http')) imageUrls.push(c.background_image_url); });
+
+    // Threads cards
+    state.threadsCards
+      .filter((c) => thContentIds.includes(c.threads_content_id))
+      .forEach((c) => { if (c.media_url?.startsWith('http')) imageUrls.push(c.media_url); });
+
+    // YouTube cards
+    state.youtubeCards
+      .filter((c) => ytContentIds.includes(c.youtube_content_id))
+      .forEach((c) => { if (c.image_url?.startsWith('http')) imageUrls.push(c.image_url); });
+
+    set((s) => ({
+      contents: s.contents.filter((c) => c.id !== contentId),
+      baseArticles: s.baseArticles.filter((a) => a.content_id !== contentId),
+      blogContents: s.blogContents.filter((bc) => bc.content_id !== contentId),
+      blogCards: s.blogCards.filter((card) => !blogContentIds.includes(card.blog_content_id)),
+      instagramContents: s.instagramContents.filter((ic) => ic.content_id !== contentId),
+      instagramCards: s.instagramCards.filter((card) => !igContentIds.includes(card.instagram_content_id)),
+      threadsContents: s.threadsContents.filter((tc) => tc.content_id !== contentId),
+      threadsCards: s.threadsCards.filter((card) => !thContentIds.includes(card.threads_content_id)),
+      youtubeContents: s.youtubeContents.filter((yc) => yc.content_id !== contentId),
+      youtubeCards: s.youtubeCards.filter((card) => !ytContentIds.includes(card.youtube_content_id)),
+      selectedContentId: s.selectedContentId === contentId ? null : s.selectedContentId,
     }));
+
+    // Async R2 cleanup
+    if (imageUrls.length > 0 && r2PublicUrl) {
+      const keys = imageUrls
+        .filter((url) => url.startsWith(r2PublicUrl))
+        .map((url) => url.slice(r2PublicUrl.length + 1));
+
+      if (keys.length > 0) {
+        fetch('/api/storage/delete', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keys }),
+        }).catch(() => {});
+      }
+    }
   },
 
   // BaseArticle CRUD
