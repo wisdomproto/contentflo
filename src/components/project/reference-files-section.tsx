@@ -35,6 +35,8 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
       name: f.name,
       size: f.size,
       type: f.type || 'application/octet-stream',
+      url: null,
+      r2_key: null,
       added_at: new Date().toISOString(),
     }));
     onUpdate({ reference_files: [...files, ...newFiles] });

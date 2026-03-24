@@ -42,6 +42,8 @@ export function BgmSection({ project, onUpdate }: BgmSectionProps) {
         size: f.size,
         type: f.type || 'audio/mpeg',
         duration: null,
+        url: null,
+        r2_key: null,
         added_at: new Date().toISOString(),
       };
     });

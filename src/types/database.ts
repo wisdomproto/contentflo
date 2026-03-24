@@ -27,6 +27,8 @@ export interface ReferenceFile {
   name: string;
   size: number;
   type: string;
+  url: string | null;
+  r2_key: string | null;
   added_at: string;
 }
 
@@ -36,6 +38,8 @@ export interface BgmFile {
   size: number;
   type: string;
   duration: number | null;
+  url: string | null;
+  r2_key: string | null;
   added_at: string;
 }
 
