@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   FolderOpen, FolderClosed, FileText, Plus, ChevronRight, ChevronDown,
   MoreHorizontal, Search, Filter, ArrowUpDown, Pencil, Settings, Copy,
-  Trash2, PanelLeftClose, PanelLeft, Target,
+  Trash2, PanelLeftClose, PanelLeft, Target, BarChart3,
 } from 'lucide-react';
 import { useProjectStore } from '@/stores/project-store';
 import { cn } from '@/lib/utils';
@@ -132,7 +132,7 @@ function ProjectItem({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.name);
   const renameRef = useRef<HTMLInputElement>(null);
-  const { selectProject, updateProject, deleteProject, duplicateProject, openProjectSettings, openStrategy, showStrategy } = useProjectStore();
+  const { selectProject, updateProject, deleteProject, duplicateProject, openProjectSettings, openStrategy, showStrategy, openAnalytics, showAnalytics } = useProjectStore();
 
   useEffect(() => {
     if (isRenaming) renameRef.current?.focus();
@@ -228,6 +228,18 @@ function ProjectItem({
           >
             <Target size={14} className="shrink-0 text-emerald-600" />
             <span className="flex-1 text-left truncate font-medium">마케팅 전략</span>
+          </button>
+          {/* 사이트 분석 고정 항목 */}
+          <button
+            onClick={() => openAnalytics(project.id)}
+            className={cn(
+              'w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors',
+              'hover:bg-accent',
+              isSelected && showAnalytics && 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+            )}
+          >
+            <BarChart3 size={14} className="shrink-0 text-blue-600" />
+            <span className="flex-1 text-left truncate font-medium">사이트 분석</span>
           </button>
           {contents.map((content) => (
             <ContentItem

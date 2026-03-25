@@ -35,6 +35,9 @@ interface ProjectState {
   sidebarCollapsed: boolean;
   showProjectSettings: boolean;
   showStrategy: boolean;
+  showAnalytics: boolean;
+  openAnalytics: (projectId: string) => void;
+  setShowAnalytics: (show: boolean) => void;
   searchQuery: string;
   filterStatus: ContentStatus | 'all';
   sortBy: 'name' | 'date';
@@ -160,6 +163,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
   sidebarCollapsed: false,
   showProjectSettings: false,
   showStrategy: false,
+  showAnalytics: false,
   searchQuery: '',
   filterStatus: 'all',
   sortBy: 'name',
@@ -167,7 +171,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
 
   setProjects: (projects) => set({ projects }),
   selectProject: (projectId) =>
-    set({ selectedProjectId: projectId, selectedContentId: null, showProjectSettings: false, showStrategy: false }),
+    set({ selectedProjectId: projectId, selectedContentId: null, showProjectSettings: false, showStrategy: false, showAnalytics: false }),
   selectContent: (contentId) => {
     if (contentId) {
       const content = get().contents.find(c => c.id === contentId);
@@ -176,6 +180,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
         selectedProjectId: content?.project_id ?? get().selectedProjectId,
         showProjectSettings: false,
         showStrategy: false,
+        showAnalytics: false,
       });
     } else {
       set({ selectedContentId: null });
@@ -1111,13 +1116,17 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
 
   // UI state
   openProjectSettings: (projectId) => {
-    set({ selectedProjectId: projectId, selectedContentId: null, showProjectSettings: true, showStrategy: false });
+    set({ selectedProjectId: projectId, selectedContentId: null, showProjectSettings: true, showStrategy: false, showAnalytics: false });
   },
-  setShowProjectSettings: (show) => set({ showProjectSettings: show, showStrategy: false }),
+  setShowProjectSettings: (show) => set({ showProjectSettings: show, showStrategy: false, showAnalytics: false }),
   openStrategy: (projectId) => {
-    set({ selectedProjectId: projectId, selectedContentId: null, showProjectSettings: false, showStrategy: true });
+    set({ selectedProjectId: projectId, selectedContentId: null, showProjectSettings: false, showStrategy: true, showAnalytics: false });
   },
-  setShowStrategy: (show) => set({ showStrategy: show, showProjectSettings: false }),
+  setShowStrategy: (show) => set({ showStrategy: show, showProjectSettings: false, showAnalytics: false }),
+  openAnalytics: (projectId) => {
+    set({ selectedProjectId: projectId, selectedContentId: null, showProjectSettings: false, showStrategy: false, showAnalytics: true });
+  },
+  setShowAnalytics: (show) => set({ showAnalytics: show, showProjectSettings: false, showStrategy: false }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setFilterStatus: (status) => set({ filterStatus: status }),
   setSortBy: (sortBy) => set({ sortBy }),

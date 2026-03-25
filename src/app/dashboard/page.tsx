@@ -4,6 +4,7 @@ import { useProjectStore } from '@/stores/project-store';
 import { ContentTabs } from '@/components/content/content-tabs';
 import { ProjectSettings } from '@/components/project/project-settings';
 import { StrategyDashboard } from '@/components/strategy/strategy-dashboard';
+import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard';
 import { FolderOpen } from 'lucide-react';
 
 function EmptyState() {
@@ -29,6 +30,7 @@ export default function DashboardPage() {
   const selectedContentId = useProjectStore((s) => s.selectedContentId);
   const showProjectSettings = useProjectStore((s) => s.showProjectSettings);
   const showStrategy = useProjectStore((s) => s.showStrategy);
+  const showAnalytics = useProjectStore((s) => s.showAnalytics);
   const projects = useProjectStore((s) => s.projects);
 
   if (!selectedProjectId) {
@@ -38,6 +40,11 @@ export default function DashboardPage() {
   // Show strategy dashboard
   if (showStrategy) {
     return <StrategyDashboard />;
+  }
+
+  // Show analytics dashboard
+  if (showAnalytics) {
+    return <AnalyticsDashboard />;
   }
 
   // Show project settings when explicitly requested or no content selected
