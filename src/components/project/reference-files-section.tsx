@@ -187,17 +187,18 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>참고 자료 파일</CardTitle>
-            {textFileCount > 0 && (
+            {files.length > 0 && (
               <Button
                 onClick={handleAnalyze}
-                disabled={isAnalyzing}
+                disabled={isAnalyzing || textFileCount === 0}
                 size="sm"
                 className="gap-1.5"
+                title={textFileCount === 0 ? '분석 가능한 텍스트 파일이 없습니다. txt, md 파일을 업로드하세요.' : undefined}
               >
                 {isAnalyzing ? (
                   <><Loader2 size={14} className="animate-spin" /> 분석 중...</>
                 ) : (
-                  <><Sparkles size={14} /> AI 분석 ({textFileCount}개 파일)</>
+                  <><Sparkles size={14} /> AI 분석{textFileCount > 0 ? ` (${textFileCount}개 파일)` : ''}</>
                 )}
               </Button>
             )}
