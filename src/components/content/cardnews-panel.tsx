@@ -3,7 +3,8 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CardNewsCardItem, AddSlideButton, CardTextOverlay, type CardTextStyle } from './cardnews-card-item';
+import { CardNewsCardItem, AddSlideButton, CardTextOverlay, getAspectRatioCSS, type CardTextStyle } from './cardnews-card-item';
+import { CARD_TEMPLATES, TEMPLATE_CATEGORIES } from './cardnews-templates';
 import { ChannelModelSelector } from './channel-model-selector';
 import { ChannelContentList } from './channel-content-list';
 import { PromptEditDialog } from './prompt-edit-dialog';
@@ -19,42 +20,7 @@ import { GenerationButton } from './generation-button';
 import type { Content, Project, InstagramContent, InstagramCard, BlogCard } from '@/types/database';
 import { generateId, cn } from '@/lib/utils';
 
-// ─── 카드뉴스 템플릿 프리셋 ────────────────────────────
-
-const CARD_TEMPLATES: { name: string; style: Partial<CardTextStyle> }[] = [
-  {
-    name: '클린 화이트',
-    style: { bgColor: '#ffffff', color: '#1a1a1a', strokeWidth: 0, headlineFontSize: 22, bodyFontSize: 13, textAlign: 'center', headlineBodyGap: 6 },
-  },
-  {
-    name: '다크 모던',
-    style: { bgColor: '#1a1a2e', color: '#ffffff', strokeWidth: 0, headlineFontSize: 22, bodyFontSize: 13, textAlign: 'center', headlineBodyGap: 6 },
-  },
-  {
-    name: '네이비 블루',
-    style: { bgColor: '#0f3460', color: '#e8f1f8', strokeWidth: 0, headlineFontSize: 24, bodyFontSize: 14, textAlign: 'center', headlineBodyGap: 8 },
-  },
-  {
-    name: '포레스트 그린',
-    style: { bgColor: '#2d6a4f', color: '#f0fdf4', strokeWidth: 0, headlineFontSize: 22, bodyFontSize: 13, textAlign: 'center', headlineBodyGap: 6 },
-  },
-  {
-    name: '코랄 핑크',
-    style: { bgColor: '#e76f51', color: '#ffffff', strokeWidth: 0, headlineFontSize: 22, bodyFontSize: 13, textAlign: 'center', headlineBodyGap: 6 },
-  },
-  {
-    name: '로얄 퍼플',
-    style: { bgColor: '#533483', color: '#f3e8ff', strokeWidth: 0, headlineFontSize: 22, bodyFontSize: 13, textAlign: 'center', headlineBodyGap: 6 },
-  },
-  {
-    name: '파스텔 베이지',
-    style: { bgColor: '#fdf6ec', color: '#5c4033', strokeWidth: 0, headlineFontSize: 20, bodyFontSize: 12, textAlign: 'center', headlineBodyGap: 4 },
-  },
-  {
-    name: '볼드 블랙',
-    style: { bgColor: '#000000', color: '#ffd93d', strokeWidth: 1, strokeColor: '#000000', headlineFontSize: 26, bodyFontSize: 14, textAlign: 'center', headlineBodyGap: 8 },
-  },
-];
+// Templates imported from cardnews-templates.ts
 
 // ─── Inner: 개별 카드뉴스 콘텐츠 ────────────────────────────
 
@@ -757,26 +723,43 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
       {cards.length > 0 && (
         <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
           <h3 className="text-xs font-semibold">템플릿</h3>
-          <div className="grid grid-cols-4 gap-2">
-            {CARD_TEMPLATES.map(t => (
-              <button
-                key={t.name}
-                onClick={() => applyGlobalStyle(t.style)}
-                className="rounded-lg border border-border overflow-hidden hover:ring-2 hover:ring-primary transition-all"
-              >
-                <div className="aspect-[4/5] relative" style={{ backgroundColor: t.style.bgColor }}>
-                  <div className="absolute inset-x-0 top-0 flex flex-col items-center justify-center px-2 py-1" style={{ height: '40%' }}>
-                    <p className="text-[7px] font-bold truncate" style={{ color: t.style.color }}>헤드라인</p>
-                    <p className="text-[5px] truncate" style={{ color: t.style.color, opacity: 0.8 }}>본문 텍스트</p>
-                  </div>
-                  <div className="absolute inset-x-0 bottom-0 bg-gray-300" style={{ height: '60%' }}>
-                    <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-400" />
-                  </div>
+          {TEMPLATE_CATEGORIES.map(cat => {
+            const templates = CARD_TEMPLATES.filter(t => t.category === cat.id);
+            if (templates.length === 0) return null;
+            return (
+              <div key={cat.id} className="space-y-1.5">
+                <p className="text-[10px] font-medium text-muted-foreground">{cat.icon} {cat.label}</p>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {templates.map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => applyGlobalStyle(t.style)}
+                      className="rounded-md border border-border overflow-hidden hover:ring-2 hover:ring-primary transition-all"
+                      title={t.name}
+                    >
+                      <div
+                        className="aspect-square relative"
+                        style={{ background: t.style.bgGradient || t.preview.bg }}
+                      >
+                        {t.preview.accent && (
+                          <div className="absolute top-1 left-1 w-3 h-0.5 rounded" style={{ backgroundColor: t.preview.accent }} />
+                        )}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <p className="text-[7px] font-bold" style={{ color: t.preview.text }}>Aa</p>
+                        </div>
+                        {t.style.aspectRatio && t.style.aspectRatio !== '4:5' && (
+                          <span className="absolute bottom-0.5 right-0.5 text-[5px] font-mono px-0.5 rounded bg-black/40 text-white/80">
+                            {t.style.aspectRatio}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[7px] text-center py-0.5 bg-muted/50 truncate px-0.5">{t.name}</p>
+                    </button>
+                  ))}
                 </div>
-                <p className="text-[9px] text-center py-1 bg-muted/50">{t.name}</p>
-              </button>
-            ))}
-          </div>
+              </div>
+            );
+          })}
           <h3 className="text-xs font-semibold pt-2">스타일 조정</h3>
           {/* Row 1: font color + bg color */}
           <div className="flex gap-4 text-[10px]">
@@ -913,38 +896,83 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
                 ✕ 닫기
               </Button>
             </div>
-            {cards[previewIndex] && (
-              <div
-                className="relative rounded-lg overflow-hidden"
-                style={{ width: '64vmin', aspectRatio: '4/5', backgroundColor: ((cards[previewIndex].text_style as CardTextStyle)?.bgColor) || cards[previewIndex].background_color || '#1a1a2e' }}
-              >
-                {/* Top: text (40%) */}
-                <div className="absolute inset-x-0 top-0 flex items-center justify-center p-6" style={{ height: '40%' }}>
-                  {(() => {
-                    const s = (cards[previewIndex].text_style ?? {}) as CardTextStyle;
-                    if (!s.headline && !s.body && !cards[previewIndex].text_content) return null;
-                    return (
+            {cards[previewIndex] && (() => {
+              const ps = (cards[previewIndex].text_style ?? {}) as CardTextStyle;
+              const pLayout = ps.layoutType || 'standard';
+              const pBg = ps.bgGradient
+                ? { background: ps.bgGradient }
+                : { backgroundColor: ps.bgColor || cards[previewIndex].background_color || '#1a1a2e' };
+              const pAr = getAspectRatioCSS(ps.aspectRatio || '4/5');
+              const hasImg = !!cards[previewIndex].background_image_url;
+
+              if (pLayout === 'text-only') {
+                return (
+                  <div className="relative rounded-lg overflow-hidden" style={{ width: '64vmin', aspectRatio: pAr, ...pBg }}>
+                    {ps.accentColor && <div className="absolute top-6 left-6 w-12 h-1.5 rounded z-10" style={{ backgroundColor: ps.accentColor }} />}
+                    <div className={cn('absolute inset-0 flex p-10', ps.textPosition === 'center' ? 'items-center justify-center' : 'items-end pb-16')}>
+                      <CardTextOverlay style={ps} hasImage={false} scale={3} />
+                    </div>
+                  </div>
+                );
+              }
+
+              if (pLayout === 'photo-bg') {
+                return (
+                  <div className="relative rounded-lg overflow-hidden" style={{ width: '64vmin', aspectRatio: pAr, ...pBg }}>
+                    {hasImg && <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={cards[previewIndex].background_image_url!} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/30 to-black/70" />
+                    </>}
+                    <div className={cn('absolute inset-x-0 p-8 z-10', ps.textPosition === 'center' ? 'inset-0 flex items-center justify-center' : 'bottom-0')}>
+                      <CardTextOverlay style={{ ...ps, color: ps.color || '#ffffff' }} hasImage={true} scale={3} />
+                    </div>
+                  </div>
+                );
+              }
+
+              if (pLayout === 'split-top') {
+                return (
+                  <div className="relative rounded-lg overflow-hidden" style={{ width: '64vmin', aspectRatio: pAr, ...pBg }}>
+                    <div className="absolute inset-x-0 top-0 overflow-hidden" style={{ height: '50%' }}>
+                      {hasImg ? <img src={cards[previewIndex].background_image_url!} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/5" />}
+                    </div>
+                    <div className="absolute inset-x-0 bottom-0 flex items-center p-8" style={{ height: '50%' }}>
+                      <CardTextOverlay style={ps} hasImage={false} scale={3} />
+                    </div>
+                  </div>
+                );
+              }
+
+              if (pLayout === 'split-left') {
+                return (
+                  <div className="relative rounded-lg overflow-hidden flex" style={{ width: '64vmin', aspectRatio: pAr, ...pBg }}>
+                    <div className="w-1/2 flex items-center p-6">
+                      <CardTextOverlay style={ps} hasImage={false} scale={3} />
+                    </div>
+                    <div className="w-1/2 overflow-hidden">
+                      {hasImg ? <img src={cards[previewIndex].background_image_url!} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/5" />}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Standard
+              return (
+                <div className="relative rounded-lg overflow-hidden" style={{ width: '64vmin', aspectRatio: pAr, ...pBg }}>
+                  <div className="absolute inset-x-0 top-0 flex items-center justify-center p-6" style={{ height: '40%' }}>
+                    {(ps.headline || ps.body || cards[previewIndex].text_content) && (
                       <div className="relative w-full h-full flex items-center justify-center">
-                        <CardTextOverlay style={s} hasImage={false} scale={3} />
+                        <CardTextOverlay style={ps} hasImage={false} scale={3} />
                       </div>
-                    );
-                  })()}
+                    )}
+                  </div>
+                  <div className="absolute inset-x-0 bottom-0 overflow-hidden" style={{ height: '60%' }}>
+                    {hasImg ? <img src={cards[previewIndex].background_image_url!} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/5" />}
+                  </div>
                 </div>
-                {/* Bottom: image (60%) */}
-                <div className="absolute inset-x-0 bottom-0 overflow-hidden" style={{ height: '60%' }}>
-                  {cards[previewIndex].background_image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={cards[previewIndex].background_image_url!}
-                      alt={`슬라이드 ${previewIndex + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-white/5" />
-                  )}
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       )}
