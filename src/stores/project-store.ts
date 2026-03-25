@@ -1177,4 +1177,66 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
     selectedProjectId: state.selectedProjectId,
     selectedContentId: state.selectedContentId,
   }),
+  onRehydrateStorage: () => {
+    // IndexedDB 복원 완료 후 R2에서 최신 데이터 로드
+    return (_state, error) => {
+      if (error) return;
+      loadFromCloud();
+    };
+  },
 }));
+
+// ─── R2 클라우드 동기화 ───
+
+const SYNC_FIELDS = [
+  'projects', 'contents', 'baseArticles',
+  'blogContents', 'blogCards',
+  'instagramContents', 'instagramCards',
+  'threadsContents', 'threadsCards',
+  'youtubeContents', 'youtubeCards',
+  'strategies', 'selectedProjectId', 'selectedContentId',
+] as const;
+
+function getPartialState() {
+  const state = useProjectStore.getState();
+  const partial: Record<string, unknown> = {};
+  for (const key of SYNC_FIELDS) partial[key] = state[key];
+  return partial;
+}
+
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+function saveToCloud() {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    try {
+      await fetch('/api/storage/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: getPartialState() }),
+      });
+    } catch {
+      // 오프라인이면 무시 — IndexedDB에는 이미 저장됨
+    }
+  }, 3000); // 3초 디바운스
+}
+
+async function loadFromCloud() {
+  try {
+    const res = await fetch('/api/storage/sync');
+    if (!res.ok) return;
+    const { data } = await res.json();
+    if (!data) return;
+
+    // R2 데이터가 로컬보다 프로젝트가 더 많으면 R2 데이터 사용
+    const local = useProjectStore.getState();
+    if (data.projects?.length > 0 && data.projects.length >= (local.projects?.length ?? 0)) {
+      useProjectStore.setState(data);
+    }
+  } catch {
+    // 실패 시 무시 — 로컬 데이터 유지
+  }
+}
+
+// 스토어 변경 구독 → 자동 클라우드 저장
+useProjectStore.subscribe(saveToCloud);
