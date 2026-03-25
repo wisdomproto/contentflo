@@ -1,13 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import * as mammoth from 'mammoth';
 
 interface FileInfo {
   name: string;
-  content?: string;  // 이미 추출된 텍스트
-  url?: string;      // R2 public URL (서버에서 fetch)
+  content?: string;
+  url?: string;
 }
 
 const TEXT_EXTS = ['.txt', '.md', '.markdown', '.csv', '.json', '.xml', '.html'];
+
+async function extractTextFromUrl(name: string, url: string): Promise<string | null> {
+  const lowerName = name.toLowerCase();
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const arrayBuf = await res.arrayBuffer();
+
+    // PDF
+    if (lowerName.endsWith('.pdf')) {
+      const { extractText } = await import('unpdf');
+      const result = await extractText(Buffer.from(arrayBuf));
+      const text = Array.isArray(result.text) ? result.text.join('\n') : result.text;
+      return text || null;
+    }
+
+    // DOCX
+    if (lowerName.endsWith('.docx') || lowerName.endsWith('.doc')) {
+      const result = await mammoth.extractRawText({ buffer: Buffer.from(arrayBuf) });
+      return result.value || null;
+    }
+
+    // Plain text
+    if (TEXT_EXTS.some(ext => lowerName.endsWith(ext))) {
+      return new TextDecoder().decode(arrayBuf);
+    }
+
+    return null;
+  } catch (err) {
+    console.error(`[analyze-references] Failed to extract text from ${name}:`, err);
+    return null;
+  }
+}
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -26,31 +61,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '분석할 파일이 없습니다.' }, { status: 400 });
     }
 
-    // 텍스트 수집: content가 있으면 사용, 없으면 URL에서 서버사이드 fetch
+    // 텍스트 수집
     const texts: { name: string; content: string }[] = [];
+    const errors: string[] = [];
 
     for (const f of files) {
       if (f.content) {
         texts.push({ name: f.name, content: f.content });
       } else if (f.url) {
-        const isText = TEXT_EXTS.some(ext => f.name.toLowerCase().endsWith(ext));
-        if (isText) {
-          try {
-            const res = await fetch(f.url);
-            if (res.ok) {
-              const text = await res.text();
-              if (text.length > 0) {
-                texts.push({ name: f.name, content: text });
-              }
-            }
-          } catch { /* skip */ }
+        const extracted = await extractTextFromUrl(f.name, f.url);
+        if (extracted && extracted.trim().length > 0) {
+          texts.push({ name: f.name, content: extracted });
+        } else {
+          errors.push(f.name);
         }
+      } else {
+        errors.push(f.name);
       }
     }
 
     if (texts.length === 0) {
       return NextResponse.json({
-        error: '분석할 텍스트를 찾을 수 없습니다. txt, md 등 텍스트 파일을 업로드하세요.',
+        error: `텍스트를 추출할 수 없습니다.\n실패: ${errors.join(', ')}\n지원 형식: PDF, DOCX, TXT, MD`,
       }, { status: 400 });
     }
 
@@ -99,7 +131,11 @@ ${refContent}
 
     const summary = response.text ?? '';
 
-    return NextResponse.json({ summary, analyzedFiles: texts.length });
+    return NextResponse.json({
+      summary,
+      analyzedFiles: texts.length,
+      skippedFiles: errors.length > 0 ? errors : undefined,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : '분석 오류';
     return NextResponse.json({ error: message }, { status: 500 });
