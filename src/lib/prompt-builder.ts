@@ -171,14 +171,22 @@ export function buildBlogPrompt(ctx: PromptContext): string {
   sections.push('기본 글을 네이버 블로그 섹션 형식으로 변환해 주세요. SEO 100점 만점을 목표로 작성합니다.');
   sections.push('각 섹션은 이미지 1장 + 텍스트 본문으로 구성됩니다.');
   sections.push('반드시 아래 JSON 형식으로만 출력하세요. 다른 텍스트는 포함하지 마세요.');
+  const primaryKw = keywords?.primary || '가장 핵심이 되는 키워드 1개';
+  const secondaryKws = keywords?.secondary?.length
+    ? keywords.secondary.map(k => `"${k}"`).join(', ')
+    : '"보조 키워드1", "보조 키워드2", "보조 키워드3"';
+  const seoTitleHint = seoTitle
+    ? `"${seoTitle}" 을 참고하여 SEO 최적화 (15~25자, 핵심 키워드 앞쪽 배치)`
+    : '네이버 SEO 최적화 제목 (15~25자, 핵심 키워드 앞쪽 배치)';
+
   sections.push(`\`\`\`json
 {
-  "seo_title": "네이버 SEO 최적화 제목 (15~25자, 핵심 키워드 앞쪽 배치)",
-  "primary_keyword": "가장 핵심이 되는 키워드 1개",
-  "secondary_keywords": ["보조 키워드1", "보조 키워드2", "보조 키워드3"],
+  "seo_title": "${seoTitleHint}",
+  "primary_keyword": "${primaryKw}",
+  "secondary_keywords": [${secondaryKws}],
   "sections": [
-    { "text": "<h2>섹션 제목</h2><p>본문 HTML 내용</p>", "alt": "이미지 설명 (키워드 포함)", "caption": "이미지 캡션" },
-    { "text": "<h3>소제목</h3><p>본문 내용...</p>", "alt": "이미지 설명", "caption": "캡션" }
+    { "text": "<h2>섹션 제목</h2><p>본문 HTML 내용</p>", "alt": "이미지 설명 (키워드 포함)", "caption": "이미지 캡션", "image_prompt": "English image generation prompt: style, subject, composition, mood" },
+    { "text": "<h3>소제목</h3><p>본문 내용...</p>", "alt": "이미지 설명", "caption": "캡션", "image_prompt": "English image generation prompt for this section" }
   ]
 }
 \`\`\``);
@@ -202,6 +210,8 @@ export function buildBlogPrompt(ctx: PromptContext): string {
   sections.push('');
   sections.push('### 이미지 (10점 배점)');
   sections.push('- 섹션마다 이미지 1장 = 6~8장. 모든 이미지에 alt 텍스트 필수 (키워드 포함 권장).');
+  sections.push('- image_prompt: 각 섹션 내용에 맞는 이미지 생성 프롬프트를 영어로 작성. 스타일, 주제, 구도, 분위기 포함.');
+  sections.push('- 사람이 등장하면 East Asian/Korean appearance. 텍스트가 있으면 한글(Korean).');
   sections.push('');
   sections.push('### 첫 문단 임팩트 — D.I.A.+ (10점 배점)');
   sections.push('- 첫 150자 안에 반드시: ① 핵심 키워드 ② 글의 요점/결론 포함.');
@@ -319,26 +329,35 @@ export function buildCardNewsImagePromptsPrompt(ctx: PromptContext): string {
   sections.push('반드시 아래 JSON 형식으로만 출력하세요. 다른 텍스트는 포함하지 마세요.');
   sections.push(`\`\`\`json
 {
-  "caption": "인스타그램 캡션 (한국어, 이모지 포함)",
+  "caption": "인스타그램 캡션: 글 전체 내용을 요약하여 작성 (한국어, 이모지 포함)",
   "hashtags": ["태그1", "태그2", "태그3"],
   "slides": [
     {
-      "image_prompt": "English image generation prompt describing the visual for this slide. Be specific about style, colors, composition, mood.",
-      "text_overlay": "슬라이드 위에 표시할 텍스트 (한국어, 선택적, 없으면 빈 문자열)"
+      "headline": "헤드라인 (10~15자)",
+      "body": "본문 텍스트 (30~50자, 최대 70자)",
+      "image_prompt": "English image generation prompt"
     }
   ]
 }
 \`\`\``);
 
-  sections.push('\n슬라이드 구성 가이드:');
+  sections.push('\n캡션 작성 가이드:');
+  sections.push('- 글의 핵심 내용을 빠짐없이 요약하세요. 읽는 사람이 캡션만으로 전체 내용을 파악할 수 있어야 합니다.');
+  sections.push('- "궁금하다면 넘겨보세요", "지금 바로 확인하세요" 같은 유도 문구는 쓰지 마세요.');
+  sections.push('- 핵심 정보, 수치, 팩트를 구체적으로 나열하세요.');
+  sections.push('- 이모지는 구분자 용도로 적절히 사용.');
+  sections.push('\n슬라이드 텍스트 규칙:');
+  sections.push('- headline: 헤드라인. 10~15자. 한눈에 읽히는 핵심 키워드/문장.');
+  sections.push('- body: 본문 텍스트. 30~50자 (최대 70자). 해당 슬라이드의 핵심 내용 요약.');
+  sections.push('- headline + body 합계 40~80자. 여백 포함 가독성 고려.');
+  sections.push('- 첫 슬라이드: 주목을 끄는 타이틀 (headline만 크게, body는 부제목)');
+  sections.push('- 마지막 슬라이드: 핵심 요약 또는 정리');
+  sections.push('\n슬라이드 이미지 가이드:');
   sections.push('- 총 5~10장 슬라이드로 구성하세요.');
-  sections.push('- 첫 슬라이드: 주목을 끄는 타이틀 이미지');
-  sections.push('- 중간 슬라이드: 핵심 내용을 시각적으로 표현하는 이미지');
-  sections.push('- 마지막 슬라이드: CTA (팔로우/저장/공유 유도) 이미지');
   sections.push('- image_prompt는 반드시 영어로 작성하세요 (이미지 모델 최적화)');
   sections.push('- image_prompt에 포함할 내용: 스타일(illustration, photo, flat design 등), 색상 팔레트, 구도, 분위기, 주요 객체');
   sections.push('- 모든 슬라이드의 이미지 스타일은 일관되게 유지하세요 (같은 색상 팔레트, 같은 일러스트 스타일)');
-  sections.push('- text_overlay: 슬라이드 위에 표시할 한국어 텍스트. 30자 이내로 간결하게. 이미지만으로 전달되면 빈 문자열.');
+  sections.push('- Korean context: any text in the image must be in Korean (한글). People should be East Asian / Korean appearance.');
 
   sections.push(...buildBrandContext(project));
 
@@ -442,6 +461,7 @@ export function buildBlogImagePromptForCard(
   }
 
   parts.push('High quality, suitable for a professional blog post. No text in the image.');
+  parts.push('Korean context: any text shown must be in Korean (한글). People should be East Asian / Korean appearance.');
 
   return parts.join('\n');
 }
@@ -554,6 +574,7 @@ export function buildYoutubeImagePrompt(
   }
 
   parts.push('Wide angle, 16:9 composition, suitable for YouTube video. No text or watermarks in the image.');
+  parts.push('Korean context: any text shown must be in Korean (한글). People should be East Asian / Korean appearance.');
 
   return parts.join('\n');
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { X, Download, FileText, Loader2 } from 'lucide-react';
 import { useProjectStore } from '@/stores/project-store';
@@ -17,7 +17,8 @@ export function WeeklyReportDialog({ projectId, onClose }: WeeklyReportDialogPro
   const [reportHtml, setReportHtml] = useState<string | null>(null);
 
   const project = useProjectStore(s => s.projects.find(p => p.id === projectId));
-  const contents = useProjectStore(s => s.contents.filter(c => c.project_id === projectId));
+  const allContents = useProjectStore(s => s.contents);
+  const contents = useMemo(() => allContents.filter(c => c.project_id === projectId), [allContents, projectId]);
   const blogContents = useProjectStore(s => s.blogContents);
   const instagramContents = useProjectStore(s => s.instagramContents);
   const threadsContents = useProjectStore(s => s.threadsContents);

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
+import { useEffect, useImperativeHandle, forwardRef, useCallback, useRef as useReactRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
+import type { Editor } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
@@ -22,10 +23,41 @@ interface BaseArticleEditorProps {
   initialContent?: string;
   onUpdate?: (html: string, plainText: string, wordCount: number) => void;
   onPartialRegenerate?: (selectedText: string) => void;
+  projectId?: string;
 }
 
 export const BaseArticleEditor = forwardRef<BaseArticleEditorRef, BaseArticleEditorProps>(
-  function BaseArticleEditor({ initialContent, onUpdate, onPartialRegenerate }, ref) {
+  function BaseArticleEditor({ initialContent, onUpdate, onPartialRegenerate, projectId }, ref) {
+    const editorInstanceRef = useReactRef<Editor | null>(null);
+
+    const uploadImageToR2 = useCallback(async (file: File): Promise<void> => {
+      const ed = editorInstanceRef.current;
+      if (!projectId || !ed) return;
+      try {
+        const presignRes = await fetch('/api/storage/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId,
+            category: 'images',
+            fileName: file.name,
+            contentType: file.type,
+          }),
+        });
+        if (!presignRes.ok) return;
+        const { presignedUrl, publicUrl } = await presignRes.json();
+        const uploadRes = await fetch(presignedUrl, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type },
+        });
+        if (!uploadRes.ok) return;
+        ed.chain().focus().setImage({ src: publicUrl }).run();
+      } catch {
+        // Silently fail — user can retry via toolbar
+      }
+    }, [projectId]);
+
     const editor = useEditor({
       immediatelyRender: false,
       extensions: [
@@ -38,6 +70,24 @@ export const BaseArticleEditor = forwardRef<BaseArticleEditorRef, BaseArticleEdi
         attributes: {
           class: 'tiptap prose-sm px-4 py-3 focus:outline-none',
         },
+        handleDrop: (_view, event) => {
+          const file = event.dataTransfer?.files?.[0];
+          if (file?.type.startsWith('image/') && projectId) {
+            event.preventDefault();
+            uploadImageToR2(file);
+            return true;
+          }
+          return false;
+        },
+        handlePaste: (_view, event) => {
+          const file = event.clipboardData?.files?.[0];
+          if (file?.type.startsWith('image/') && projectId) {
+            event.preventDefault();
+            uploadImageToR2(file);
+            return true;
+          }
+          return false;
+        },
       },
       onUpdate: ({ editor: e }) => {
         if (onUpdate) {
@@ -47,6 +97,9 @@ export const BaseArticleEditor = forwardRef<BaseArticleEditorRef, BaseArticleEdi
         }
       },
     });
+
+    // Keep ref in sync
+    editorInstanceRef.current = editor;
 
     useEffect(() => {
       if (editor && initialContent !== undefined && editor.getHTML() !== initialContent) {
@@ -74,7 +127,7 @@ export const BaseArticleEditor = forwardRef<BaseArticleEditorRef, BaseArticleEdi
 
     return (
       <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-background">
-        <EditorToolbar editor={editor} />
+        <EditorToolbar editor={editor} projectId={projectId} />
         <div className="min-h-[400px]">
           <EditorContent editor={editor} />
         </div>

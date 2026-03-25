@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { buildStrategyPrompt } from '@/lib/strategy-prompt-builder';
 import type { StrategyInput, KeywordItem, CrawlResult, StrategyTab } from '@/types/strategy';
+import { DEFAULT_STRATEGY_MODEL } from '@/lib/ai-models';
 
 export async function POST(req: NextRequest) {
   const { tab, instruction, input, keywordData, crawlData, model } = (await req.json()) as {
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
         }, instruction);
 
         const response = await ai.models.generateContent({
-          model: model || 'gemini-2.5-flash',
+          model: model || DEFAULT_STRATEGY_MODEL,
           contents: prompt,
         });
 

@@ -13,7 +13,8 @@ import { ChannelModelSelector } from './channel-model-selector';
 import { buildBaseArticlePrompt, buildPartialRegenerationPrompt, buildTopicSuggestionPrompt } from '@/lib/prompt-builder';
 import { countWords } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
-import { Lightbulb, Sparkles, Search, Loader2, X, Pencil, Check } from 'lucide-react';
+import { Lightbulb, Search, Loader2, X, Pencil, Check } from 'lucide-react';
+import { GenerationButton } from './generation-button';
 import type { Content, Project } from '@/types/database';
 
 interface BaseArticlePanelInnerProps {
@@ -205,24 +206,19 @@ function BaseArticlePanelInner({ content, project }: BaseArticlePanelInnerProps)
           <Badge variant="secondary" className="text-xs">
             {wordCount}자
           </Badge>
-          {isGenerating && (
-            <Badge variant="outline" className="text-xs gap-1 text-blue-600">
-              <Loader2 size={10} className="animate-spin" /> 생성 중...
-            </Badge>
-          )}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => { setShowTopicDialog(true); }} disabled={isGenerating || isGeneratingTopics} className="gap-1.5">
             <Lightbulb size={14} /> AI 주제뽑기
           </Button>
-          <Button
+          <GenerationButton
+            variant="text"
+            isGenerating={isGenerating}
+            disabled={!hasTopic}
             onClick={handleAiGenerate}
-            disabled={isGenerating || !hasTopic}
-            className="gap-1.5"
-            title={!hasTopic ? '먼저 주제를 뽑아주세요' : undefined}
-          >
-            <Sparkles size={14} /> AI 글 생성
-          </Button>
+            onAbort={abort}
+            label="AI 글 생성"
+          />
           <Button variant="outline" disabled className="gap-1.5">
             <Search size={14} /> Perplexity 첨삭
           </Button>

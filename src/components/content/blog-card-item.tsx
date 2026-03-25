@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { GripVertical, Trash2, Plus, ChevronDown, RefreshCw, Loader2, Wand2, X, ZoomIn } from 'lucide-react';
+import { GripVertical, Trash2, Plus, ChevronDown, Loader2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ImageLightbox } from './image-lightbox';
+import { ImageCardWidget } from './image-card-widget';
 import { ImageStyleSelector } from './image-style-selector';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -114,49 +114,33 @@ function SectionImageArea({
   onGenerateImage?: () => void;
   isGenerating: boolean;
 }) {
-  const hasImage = !!content.url;
-  const [showLightbox, setShowLightbox] = useState(false);
-  const [showPrompt, setShowPrompt] = useState(!hasImage);
+  const [showPrompt, setShowPrompt] = useState(!content.url);
+  const [imageHistory, setImageHistory] = useState<string[]>([]);
 
   return (
     <div className="p-4 space-y-3">
-      {/* 이미지 영역 */}
-      {hasImage ? (
-        <div className="relative group rounded-lg overflow-hidden border border-border">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={content.url!}
-            alt={content.alt || '블로그 이미지'}
-            className="w-full max-h-72 object-cover cursor-pointer"
-            onClick={() => setShowLightbox(true)}
-          />
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-            <Button variant="secondary" size="sm" onClick={() => setShowLightbox(true)} className="h-8 text-xs gap-1.5">
-              <ZoomIn size={14} /> 확대
-            </Button>
-            {onGenerateImage && (
-              <Button variant="secondary" size="sm" onClick={onGenerateImage} disabled={isGenerating} className="h-8 text-xs gap-1.5">
-                <RefreshCw size={14} className={isGenerating ? 'animate-spin' : ''} /> 재생성
-              </Button>
-            )}
-            <Button variant="destructive" size="sm" onClick={() => onUpdate({ url: '' })} className="h-8 text-xs gap-1.5">
-              <X size={14} /> 삭제
-            </Button>
-          </div>
-          <ImageLightbox open={showLightbox} onOpenChange={setShowLightbox} src={content.url!} alt={content.alt} />
-        </div>
-      ) : (
-        <div className="rounded-lg border-2 border-dashed border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 p-6 text-center">
-          <Wand2 size={24} className="mx-auto text-emerald-400 mb-2" />
-          <p className="text-sm text-muted-foreground mb-3">이 섹션의 이미지를 생성하세요</p>
-          {onGenerateImage && (
-            <Button onClick={onGenerateImage} disabled={isGenerating} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
-              {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
-              {isGenerating ? '생성 중...' : '이미지 생성'}
-            </Button>
-          )}
-        </div>
-      )}
+      <ImageCardWidget
+        src={content.url || null}
+        alt={content.alt || '블로그 이미지'}
+        history={imageHistory}
+        aspectClass="aspect-[4/3]"
+        isGenerating={isGenerating}
+        onRegenerate={onGenerateImage}
+        onDelete={() => {
+          if (content.url) setImageHistory(prev => [content.url!, ...prev].slice(0, 10));
+          onUpdate({ url: '' });
+        }}
+        onUpload={(file) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (content.url) setImageHistory(prev => [content.url!, ...prev].slice(0, 10));
+            onUpdate({ url: reader.result as string });
+          };
+          reader.readAsDataURL(file);
+        }}
+        onRestore={(url) => onUpdate({ url })}
+        placeholder="이미지 생성 또는 업로드"
+      />
 
       {/* 프롬프트 설정 */}
       <div className="rounded-md border border-border/50 overflow-hidden">

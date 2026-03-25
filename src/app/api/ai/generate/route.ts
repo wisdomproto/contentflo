@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest } from 'next/server';
+import { DEFAULT_TEXT_MODEL } from '@/lib/ai-models';
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -11,7 +12,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { prompt, model = 'gemini-3-flash-preview' } = await req.json();
+    const { prompt, model = DEFAULT_TEXT_MODEL } = await req.json();
     if (!prompt) {
       return new Response(
         JSON.stringify({ error: '프롬프트가 필요합니다.' }),

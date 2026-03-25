@@ -2,7 +2,7 @@
 
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Cpu, ImageIcon, RectangleHorizontal, Palette } from 'lucide-react';
-import { TEXT_MODELS, IMAGE_MODELS } from '@/components/project/ai-model-section';
+import { TEXT_MODELS, IMAGE_MODELS } from '@/lib/ai-models';
 import { ASPECT_RATIO_PRESETS, ImageStyleSelector } from './image-style-selector';
 
 interface ChannelModelSelectorProps {
@@ -47,7 +47,7 @@ export function ChannelModelSelector({
             </SelectTrigger>
             <SelectContent>
               {TEXT_MODELS.map((m) => (
-                <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
+                <SelectItem key={m.id} value={m.id} className="text-xs">{m.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -61,7 +61,7 @@ export function ChannelModelSelector({
               </SelectTrigger>
               <SelectContent>
                 {IMAGE_MODELS.map((m) => (
-                  <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
+                  <SelectItem key={m.id} value={m.id} className="text-xs">{m.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

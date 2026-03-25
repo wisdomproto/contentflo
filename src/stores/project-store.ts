@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import type { Project, Content, ContentStatus, BaseArticle, BlogContent, BlogCard, InstagramContent, InstagramCard, ThreadsContent, ThreadsCard, YoutubeContent, YoutubeCard } from '@/types/database';
 import type { MarketingStrategy, StrategyInput, GenerationStatus, StrategyTab } from '@/types/strategy';
+import { DEFAULT_TEXT_MODEL, DEFAULT_IMAGE_MODEL } from '@/lib/ai-models';
 import type { ImportedStrategy } from '@/types/analytics';
 import { generateId } from '@/lib/utils';
 
@@ -1118,14 +1119,14 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
     const channelSettings = channels[channel] ?? {};
     // Default aspect ratios per channel
     const defaultAspectRatios: Record<string, string> = {
-      blog: '16:9',
-      cardnews: '1:1',
+      blog: '4:3',
+      cardnews: '4:3',
       threads: '1:1',
       youtube: '16:9',
     };
     return {
-      textModel: channelSettings.textModel ?? (settings.text_model as string) ?? 'gemini-3-flash-preview',
-      imageModel: channelSettings.imageModel ?? (settings.image_model as string) ?? 'gemini-3.1-flash-image-preview',
+      textModel: channelSettings.textModel ?? (settings.text_model as string) ?? DEFAULT_TEXT_MODEL,
+      imageModel: channelSettings.imageModel ?? (settings.image_model as string) ?? DEFAULT_IMAGE_MODEL,
       aspectRatio: channelSettings.aspectRatio ?? defaultAspectRatios[channel] ?? '1:1',
       imageStyle: channelSettings.imageStyle ?? '',
     };

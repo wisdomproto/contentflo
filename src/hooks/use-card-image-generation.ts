@@ -38,8 +38,9 @@ export interface UseCardImageGenerationReturn {
 }
 
 export function useCardImageGeneration(config: CardImageConfig): UseCardImageGenerationReturn {
-  const { isGenerating: isGeneratingImage, progress: imageProgress, generateImages, abort: abortGeneration } = useImageGeneration();
+  const { isGenerating: isGeneratingImage, generateImages, abort: abortGeneration } = useImageGeneration();
   const [generatingCardId, setGeneratingCardId] = useState<string | null>(null);
+  const [batchProgress, setBatchProgress] = useState<ImageGenerationProgress>({ current: 0, total: 0 });
   const configRef = useRef(config);
   configRef.current = config;
 
@@ -111,10 +112,14 @@ export function useCardImageGeneration(config: CardImageConfig): UseCardImageGen
     async (cards: any[]) => {
       if (cards.length === 0) return;
       const cfg = configRef.current;
-      for (let i = 0; i < cards.length; i++) {
-        const card = cards[i];
-        if (cfg.shouldSkip?.(card)) continue;
-        await generateCardImage(card.id, cards);
+      const targets = cards.filter(c => !cfg.shouldSkip?.(c));
+      const total = targets.length;
+      if (total === 0) return;
+      setBatchProgress({ current: 0, total });
+      for (let i = 0; i < targets.length; i++) {
+        setBatchProgress({ current: i, total });
+        await generateCardImage(targets[i].id, cards);
+        setBatchProgress({ current: i + 1, total });
       }
     },
     [generateCardImage]
@@ -128,7 +133,7 @@ export function useCardImageGeneration(config: CardImageConfig): UseCardImageGen
   return {
     isGeneratingImage,
     generatingCardId,
-    imageProgress,
+    imageProgress: batchProgress.total > 0 ? batchProgress : { current: 0, total: 1 },
     generateCardImage,
     generateAllImages,
     abort,

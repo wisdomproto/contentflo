@@ -15,9 +15,11 @@ import { useCardImageGeneration } from '@/hooks/use-card-image-generation';
 import { useProjectStore } from '@/stores/project-store';
 import { buildYoutubePrompt, buildYoutubeImagePrompt } from '@/lib/prompt-builder';
 import {
-  Sparkles, Loader2, Copy, Check, Eye, Clock, ImageIcon,
+  Loader2, Copy, Check, Eye, Clock, ImageIcon,
   ChevronLeft, ChevronRight, ChevronDown
 } from 'lucide-react';
+import { GenerationButton } from './generation-button';
+import { ImageCardWidget } from './image-card-widget';
 import type { Content, Project, YoutubeContent, YoutubeCard, VideoDuration } from '@/types/database';
 import { generateId } from '@/lib/utils';
 import { cn } from '@/lib/utils';
@@ -127,7 +129,7 @@ function YoutubePanelInner({ youtubeContent, content, project, hasBaseArticle, c
   });
 
   // ─── Image generation (공통 훅) ─────────────────────
-  const { isGeneratingImage, generatingCardId, generateCardImage, generateAllImages: generateAllCardImages } = useCardImageGeneration({
+  const { isGeneratingImage, generatingCardId, imageProgress, generateCardImage, generateAllImages: generateAllCardImages, abort: abortImageGeneration } = useCardImageGeneration({
     getPrompt: (card: YoutubeCard) => card.image_prompt || buildYoutubeImagePrompt(project, card, channelModels.imageStyle),
     getExistingImage: (card: YoutubeCard) => card.image_url || null,
     saveResult: (cardId: string, dataUrl: string, prompt: string) => {
@@ -273,39 +275,26 @@ function YoutubePanelInner({ youtubeContent, content, project, hasBaseArticle, c
               <Clock size={10} /> ~{estimatedMinutes}분
             </Badge>
           )}
-          {isGenerating && (
-            <Badge variant="outline" className="text-xs gap-1 text-blue-600">
-              <Loader2 size={10} className="animate-spin" /> 대본 생성 중...
-            </Badge>
-          )}
-          {isGeneratingImage && (
-            <Badge variant="outline" className="text-xs gap-1 text-green-600">
-              <ImageIcon size={10} /> 이미지 생성 중...
-            </Badge>
-          )}
         </div>
         <div className="flex gap-2">
-          <Button
+          <GenerationButton
+            variant="text"
+            isGenerating={isGenerating}
+            disabled={!hasBaseArticle}
             onClick={handleGenerate}
-            disabled={!hasBaseArticle || isGenerating}
-            size="sm"
-            className="gap-1.5 bg-red-600 hover:bg-red-700 text-white"
-          >
-            <Sparkles size={14} /> AI 대본
-          </Button>
-          {isGenerating && (
-            <Button variant="destructive" size="sm" onClick={abort}>중단</Button>
-          )}
-          <Button
+            onAbort={abort}
+            label="AI 대본"
+            loadingLabel="대본 생성 중..."
+            className={!isGenerating ? 'bg-red-600 hover:bg-red-700 text-white' : undefined}
+          />
+          <GenerationButton
+            variant="batch-image"
+            isGenerating={isGeneratingImage}
+            disabled={cards.length === 0}
             onClick={handleGenerateAllImages}
-            disabled={cards.length === 0 || isGeneratingImage}
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-          >
-            {isGeneratingImage ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
-            전체 이미지
-          </Button>
+            onAbort={abortImageGeneration}
+            progress={imageProgress}
+          />
           <Button
             variant="outline"
             size="sm"
@@ -335,38 +324,27 @@ function YoutubePanelInner({ youtubeContent, content, project, hasBaseArticle, c
           {/* Left: Preview (3/5) */}
           <div className="lg:col-span-3 space-y-3">
             {/* Scene image */}
-            <div className="relative aspect-video bg-muted/30 rounded-lg overflow-hidden border border-border">
-              {selectedCard.image_url ? (
-                <img
-                  src={selectedCard.image_url}
-                  alt={`씬 ${selectedIndex + 1}`}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/50">
-                  <ImageIcon size={48} />
-                  <p className="text-xs">이미지를 생성하세요</p>
-                  {selectedCard.screen_direction && (
-                    <p className="text-[10px] max-w-[60%] text-center text-muted-foreground/40 line-clamp-3">
-                      {selectedCard.screen_direction}
-                    </p>
-                  )}
-                </div>
-              )}
-
+            <div className="relative">
+              <ImageCardWidget
+                src={selectedCard.image_url || null}
+                alt={`씬 ${selectedIndex + 1}`}
+                aspectClass="aspect-video"
+                isGenerating={generatingCardId === selectedCard.id}
+                onRegenerate={() => handleGenerateCardImage(selectedCard.id)}
+                onDelete={() => updateYoutubeCard(selectedCard.id, { image_url: null })}
+                onUpload={(file) => {
+                  const reader = new FileReader();
+                  reader.onload = () => updateYoutubeCard(selectedCard.id, { image_url: reader.result as string });
+                  reader.readAsDataURL(file);
+                }}
+                placeholder="이미지 생성 또는 업로드"
+              />
               {/* Section badge */}
               {selectedSectionInfo && (
-                <div className="absolute top-3 left-3">
+                <div className="absolute top-3 left-3 z-10">
                   <span className={cn('text-xs font-bold px-2 py-1 rounded text-white', selectedSectionInfo.color)}>
                     {selectedSectionInfo.label}
                   </span>
-                </div>
-              )}
-
-              {/* Generating overlay */}
-              {generatingCardId === selectedCard.id && (
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                  <Loader2 size={32} className="animate-spin text-white" />
                 </div>
               )}
             </div>

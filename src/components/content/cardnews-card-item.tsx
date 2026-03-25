@@ -1,12 +1,68 @@
 'use client';
 
-import { GripVertical, Trash2, Plus, RefreshCw, ImageIcon, Palette, ChevronDown, Wand2, ZoomIn } from 'lucide-react';
+import { GripVertical, Trash2, Plus, ChevronDown, Loader2 } from 'lucide-react';
+import { ImageCardWidget } from './image-card-widget';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ImageLightbox } from './image-lightbox';
 import type { InstagramCard } from '@/types/database';
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
+
+export interface CardTextStyle {
+  fontSize?: number;
+  fontWeight?: string;
+  textAlign?: string;
+  color?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  bgEnabled?: boolean;
+  bgOpacity?: number;
+  bgBlur?: number;
+  bgColor?: string;
+  bgBorderColor?: string;
+  boxX?: number;
+  boxY?: number;
+  boxW?: number;
+  boxH?: number;
+  headline?: string;
+  body?: string;
+  headlineBodyGap?: number;
+  headlineFontSize?: number;
+  bodyFontSize?: number;
+}
+
+/** Shared text overlay renderer — used in card preview and fullscreen preview */
+export function CardTextOverlay({ style, hasImage, scale = 1 }: { style: CardTextStyle; hasImage: boolean; scale?: number }) {
+  const headlineFontSize = (style.headlineFontSize ?? 20) * scale;
+  const bodyFontSize = (style.bodyFontSize ?? 13) * scale;
+  const fallbackFontSize = (style.fontSize ?? 18) * scale;
+  const textAlign = (style.textAlign as 'center' | 'left') ?? 'center';
+  const color = style.color ?? '#ffffff';
+  const stroke = style.strokeWidth ? `${style.strokeWidth * scale}px ${style.strokeColor || '#000000'}` : undefined;
+  const shadow = !style.strokeWidth && hasImage ? '0 1px 4px rgba(0,0,0,0.7)' : undefined;
+
+  return (
+    <>
+      <div className="w-full relative z-10 px-2 flex flex-col" style={{ gap: `${(style.headlineBodyGap ?? 4) * scale}px` }}>
+        {style.headline && (
+          <p className="whitespace-pre-line break-words w-full" style={{ fontSize: `${headlineFontSize}px`, fontWeight: 'bold', textAlign, color, WebkitTextStroke: stroke, textShadow: shadow, lineHeight: 1.3 }}>
+            {style.headline}
+          </p>
+        )}
+        {style.body && (
+          <p className="whitespace-pre-line break-words w-full" style={{ fontSize: `${bodyFontSize}px`, fontWeight: 'normal', textAlign, color, opacity: 0.9, WebkitTextStroke: stroke ? `${Math.max(0.5, (style.strokeWidth || 1) * 0.7 * scale)}px ${style.strokeColor || '#000000'}` : undefined, textShadow: shadow, lineHeight: 1.4 }}>
+            {style.body}
+          </p>
+        )}
+        {!style.headline && !style.body && (
+          <p className="whitespace-pre-line break-words w-full" style={{ fontSize: `${fallbackFontSize}px`, fontWeight: style.fontWeight ?? 'bold', textAlign, color, WebkitTextStroke: stroke, textShadow: shadow }}>
+            {/* fallback: rendered by parent passing text_content */}
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
 
 const PRESET_COLORS = [
   '#1a1a2e', '#16213e', '#0f3460', '#533483',
@@ -21,128 +77,146 @@ interface CardNewsCardItemProps {
   onDelete: (cardId: string) => void;
   onRegenerateImage?: () => void;
   onGenerateImage?: () => void;
-  isRegenerating?: boolean;
+  isRegeneratingThis?: boolean;
+  isAnyRegenerating?: boolean;
 }
 
 export function CardNewsCardItem({
   card, index, onUpdate, onDelete,
   onRegenerateImage, onGenerateImage,
-  isRegenerating,
+  isRegeneratingThis, isAnyRegenerating,
 }: CardNewsCardItemProps) {
-  const style = (card.text_style ?? {}) as {
-    fontSize?: number;
-    fontWeight?: string;
-    textAlign?: string;
-    color?: string;
-  };
+  const style = (card.text_style ?? {}) as CardTextStyle;
 
-  const hasImage = !!card.background_image_url;
-  const [showColorMode, setShowColorMode] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
-  const [showLightbox, setShowLightbox] = useState(false);
-  const useImage = hasImage && !showColorMode;
+
+  // Drag / Resize state
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startX: number; startY: number; startBoxX: number; startBoxY: number; mode: 'move' | 'resize'; startBoxW: number; startBoxH: number } | null>(null);
+  const didDragRef = useRef(false);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent, mode: 'move' | 'resize') => {
+    e.preventDefault();
+    e.stopPropagation();
+    didDragRef.current = false;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    dragRef.current = {
+      startX: e.clientX, startY: e.clientY,
+      startBoxX: style.boxX ?? 5, startBoxY: style.boxY ?? 20,
+      startBoxW: style.boxW ?? 90, startBoxH: style.boxH ?? 60,
+      mode,
+    };
+    const onMove = (ev: PointerEvent) => {
+      if (!dragRef.current || !rect) return;
+      didDragRef.current = true;
+      const dx = ((ev.clientX - dragRef.current.startX) / rect.width) * 100;
+      const dy = ((ev.clientY - dragRef.current.startY) / rect.height) * 100;
+      if (dragRef.current.mode === 'move') {
+        const newX = Math.max(0, Math.min(100 - (style.boxW ?? 90), dragRef.current.startBoxX + dx));
+        const newY = Math.max(0, Math.min(100 - (style.boxH ?? 60), dragRef.current.startBoxY + dy));
+        onUpdate(card.id, { text_style: { ...style, boxX: Math.round(newX), boxY: Math.round(newY) } });
+      } else {
+        const newW = Math.max(20, Math.min(100 - (style.boxX ?? 5), dragRef.current.startBoxW + dx));
+        const newH = Math.max(15, Math.min(100 - (style.boxY ?? 20), dragRef.current.startBoxH + dy));
+        onUpdate(card.id, { text_style: { ...style, boxW: Math.round(newW), boxH: Math.round(newH) } });
+      }
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, [card.id, style, onUpdate]);
+
 
   return (
     <div className="group relative flex flex-col gap-2">
-      {/* Slide preview */}
+      {/* Slide preview — 4:5 ratio, text top 40%, image bottom 60% */}
       <div
-        className="relative aspect-square rounded-lg overflow-hidden flex items-center justify-center p-4 cursor-pointer"
-        style={{
-          backgroundColor: useImage ? undefined : (card.background_color ?? '#1a1a2e'),
-        }}
-        onClick={() => hasImage && setShowLightbox(true)}
+        ref={containerRef}
+        className="relative rounded-lg overflow-hidden"
+        style={{ aspectRatio: '4/5', backgroundColor: style.bgColor || card.background_color || '#1a1a2e' }}
       >
-        {useImage && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={card.background_image_url!}
+        {/* Top: text area (40%) */}
+        <div
+          className="absolute inset-x-0 top-0 flex items-center justify-center p-3 group/textbox"
+          style={{ height: '40%' }}
+        >
+          <span className="absolute top-2 left-2 text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/30 text-white/70 z-10">
+            {index + 1}
+          </span>
+
+          {card.text_content ? (
+            <div
+              className="relative w-full h-full flex items-center justify-center cursor-move"
+              onPointerDown={(e) => handlePointerDown(e, 'move')}
+            >
+              <div className="absolute inset-0 border border-dashed border-white/0 group-hover/textbox:border-white/30 rounded-lg pointer-events-none transition-colors" />
+              <CardTextOverlay style={style} hasImage={false} />
+              <div
+                className="absolute -bottom-1 -right-1 w-5 h-5 cursor-se-resize opacity-0 group-hover/textbox:opacity-100 transition-opacity z-20"
+                onPointerDown={(e) => handlePointerDown(e, 'resize')}
+              >
+                <svg viewBox="0 0 20 20" className="w-full h-full">
+                  <path d="M18 10 L10 18 M18 14 L14 18 M18 18 L18 18" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
+                </svg>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-white/40">텍스트를 입력하세요</p>
+          )}
+        </div>
+
+        {/* Bottom: image area (60%) */}
+        <div className="absolute inset-x-0 bottom-0 overflow-hidden" style={{ height: '60%' }}>
+          <ImageCardWidget
+            src={card.background_image_url || null}
             alt={`슬라이드 ${index + 1}`}
-            className="absolute inset-0 w-full h-full object-cover"
+            aspectClass="h-full"
+            isGenerating={isRegeneratingThis}
+            onRegenerate={onRegenerateImage}
+            onDelete={() => onUpdate(card.id, { background_image_url: null })}
+            onUpload={(file) => {
+              const reader = new FileReader();
+              reader.onload = () => onUpdate(card.id, { background_image_url: reader.result as string });
+              reader.readAsDataURL(file);
+            }}
+            onRestore={(url) => onUpdate(card.id, { background_image_url: url })}
+            placeholder="이미지 생성 또는 업로드"
           />
-        )}
+        </div>
 
-        <span className="absolute top-2 left-2 text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/30 text-white/70 z-10">
-          {index + 1}
-        </span>
-
-        <div className="absolute top-2 right-2 flex gap-1 z-10">
-          {hasImage && (
-            <Button
-              variant="ghost" size="sm"
-              onClick={(e) => { e.stopPropagation(); setShowColorMode(!showColorMode); }}
-              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 hover:bg-black/50 text-white"
-            >
-              {showColorMode ? <ImageIcon size={12} /> : <Palette size={12} />}
-            </Button>
-          )}
-          {hasImage && (
-            <Button
-              variant="ghost" size="sm"
-              onClick={(e) => { e.stopPropagation(); setShowLightbox(true); }}
-              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 hover:bg-black/50 text-white"
-            >
-              <ZoomIn size={12} />
-            </Button>
-          )}
-          {onRegenerateImage && (
-            <Button
-              variant="ghost" size="sm"
-              onClick={(e) => { e.stopPropagation(); onRegenerateImage(); }}
-              disabled={isRegenerating}
-              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 hover:bg-black/50 text-white"
-            >
-              <RefreshCw size={12} className={isRegenerating ? 'animate-spin' : ''} />
-            </Button>
-          )}
-          {!hasImage && onGenerateImage && (
-            <Button
-              variant="ghost" size="sm"
-              onClick={(e) => { e.stopPropagation(); onGenerateImage(); }}
-              disabled={isRegenerating}
-              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 hover:bg-black/50 text-white"
-            >
-              <Wand2 size={12} />
-            </Button>
-          )}
-          <Button
-            variant="ghost" size="sm"
-            onClick={(e) => { e.stopPropagation(); onDelete(card.id); }}
-            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 hover:bg-black/50 text-white"
-          >
+        {/* Card delete button */}
+        <div className="absolute top-2 right-2 z-10">
+          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onDelete(card.id); }} className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 hover:bg-black/50 text-white">
             <Trash2 size={12} />
           </Button>
         </div>
-
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-white/50 cursor-grab z-10">
-          <GripVertical size={14} />
-        </div>
-
-        {card.text_content && (
-          <p
-            className="whitespace-pre-line text-center break-words w-full relative z-10"
-            style={{
-              fontSize: `${Math.min((style.fontSize ?? 24) * 0.6, 18)}px`,
-              fontWeight: style.fontWeight ?? 'bold',
-              textAlign: (style.textAlign as 'center' | 'left') ?? 'center',
-              color: style.color ?? '#ffffff',
-              textShadow: useImage ? '0 1px 4px rgba(0,0,0,0.7)' : undefined,
-            }}
-          >
-            {card.text_content}
-          </p>
-        )}
-
-        {!card.text_content && !useImage && (
-          <p className="text-xs text-white/40 relative z-10">텍스트를 입력하세요</p>
-        )}
       </div>
 
       {/* Edit section */}
       <div className="space-y-2 px-1">
+        <input
+          value={style.headline ?? ''}
+          onChange={(e) => {
+            const h = e.target.value;
+            const combined = [h, style.body || ''].filter(Boolean).join('\n');
+            onUpdate(card.id, { text_content: combined || null, text_style: { ...style, headline: h } });
+          }}
+          placeholder="헤드라인 (10~15자)"
+          className="w-full text-xs font-bold bg-transparent border border-border rounded-md px-2 py-1 focus:outline-none focus:border-primary"
+        />
         <textarea
-          value={card.text_content ?? ''}
-          onChange={(e) => onUpdate(card.id, { text_content: e.target.value })}
-          placeholder="슬라이드 텍스트 (선택)..."
+          value={style.body ?? ''}
+          onChange={(e) => {
+            const b = e.target.value;
+            const combined = [style.headline || '', b].filter(Boolean).join('\n');
+            onUpdate(card.id, { text_content: combined || null, text_style: { ...style, body: b } });
+          }}
+          placeholder="본문 (30~50자)"
           className="w-full text-xs bg-transparent border border-border rounded-md px-2 py-1.5 resize-none focus:outline-none focus:border-primary"
           rows={2}
         />
@@ -165,64 +239,8 @@ export function CardNewsCardItem({
             />
           )}
         </div>
-
-        {/* Color picker */}
-        <div className="flex gap-1 flex-wrap">
-          {PRESET_COLORS.map((color) => (
-            <button
-              key={color}
-              onClick={() => onUpdate(card.id, { background_color: color })}
-              className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
-              style={{
-                backgroundColor: color,
-                borderColor: card.background_color === color ? 'white' : 'transparent',
-                boxShadow: card.background_color === color ? '0 0 0 2px hsl(var(--primary))' : undefined,
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Text style controls */}
-        <div className="flex gap-1 text-[10px]">
-          <button
-            onClick={() => onUpdate(card.id, {
-              text_style: { ...style, fontWeight: style.fontWeight === 'bold' ? 'normal' : 'bold' },
-            })}
-            className={`px-2 py-0.5 rounded border border-border ${style.fontWeight === 'bold' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-          >
-            B
-          </button>
-          <button
-            onClick={() => onUpdate(card.id, {
-              text_style: { ...style, textAlign: style.textAlign === 'center' ? 'left' : 'center' },
-            })}
-            className="px-2 py-0.5 rounded border border-border hover:bg-muted"
-          >
-            {style.textAlign === 'center' ? '가운데' : '왼쪽'}
-          </button>
-          <select
-            value={style.fontSize ?? 24}
-            onChange={(e) => onUpdate(card.id, {
-              text_style: { ...style, fontSize: Number(e.target.value) },
-            })}
-            className="px-1 py-0.5 rounded border border-border bg-transparent text-[10px]"
-          >
-            {[18, 20, 22, 24, 28, 32].map((s) => (
-              <option key={s} value={s}>{s}px</option>
-            ))}
-          </select>
-        </div>
       </div>
 
-      {/* Lightbox */}
-      {hasImage && (
-        <ImageLightbox
-          open={showLightbox}
-          onOpenChange={setShowLightbox}
-          src={card.background_image_url!}
-          alt={`슬라이드 ${index + 1}`}
-        />
-      )}
     </div>
   );
 }

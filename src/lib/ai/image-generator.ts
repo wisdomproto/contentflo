@@ -14,15 +14,36 @@ class GeminiImageGenerator implements ImageGenerator {
     this.model = model;
   }
 
+  private async resolveImageData(ref: string): Promise<{ mimeType: string; data: string } | null> {
+    // data:image/... 형식
+    const dataMatch = ref.match(/^data:(image\/[^;]+);base64,(.+)$/);
+    if (dataMatch) return { mimeType: dataMatch[1], data: dataMatch[2] };
+
+    // URL 형식 → fetch → base64
+    if (ref.startsWith('http://') || ref.startsWith('https://')) {
+      try {
+        const res = await fetch(ref);
+        if (!res.ok) return null;
+        const buf = await res.arrayBuffer();
+        const mimeType = res.headers.get('content-type') || 'image/png';
+        const data = Buffer.from(buf).toString('base64');
+        return { mimeType, data };
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
+  }
+
   async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
     // 참조 이미지가 있으면 multimodal input으로 전달
     let contents: string | Array<{ inlineData?: { mimeType: string; data: string }; text?: string }>;
     if (request.referenceImage) {
-      // data:image/png;base64,... 형식에서 mimeType과 data 추출
-      const match = request.referenceImage.match(/^data:(image\/[^;]+);base64,(.+)$/);
-      if (match) {
+      const imageData = await this.resolveImageData(request.referenceImage);
+      if (imageData) {
         contents = [
-          { inlineData: { mimeType: match[1], data: match[2] } },
+          { inlineData: imageData },
           { text: `Use the visual style, frame, and composition of this reference image as a guide. Generate a new image with this prompt: ${request.prompt}` },
         ];
       } else {

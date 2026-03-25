@@ -32,6 +32,8 @@ src/
 │   └── api/
 │       ├── ai/generate/              # 텍스트 AI 생성 (SSE 스트리밍)
 │       ├── ai/generate-image/        # 이미지 AI 생성
+│       ├── ai/extract-text/          # 파일 텍스트 추출 (PDF/DOCX → 서버사이드)
+│       ├── ai/analyze-references/    # 참고 자료 AI 분석 (모델 선택 가능)
 │       ├── ai/strategy/generate/     # 마케팅 전략 전체 생성 (SSE)
 │       ├── ai/strategy/regenerate/   # 마케팅 전략 탭별 재생성 (SSE)
 │       ├── ai/strategy/crawl/        # URL 크롤링 분석 (cheerio)
@@ -63,6 +65,8 @@ src/
 │   │   ├── naver-keyword-panel.tsx    # 네이버 SEO 키워드
 │   │   ├── image-style-selector.tsx   # 이미지 스타일 프리셋
 │   │   ├── image-lightbox.tsx         # 이미지 확대 뷰
+│   │   ├── image-card-widget.tsx     # 공통 이미지 카드 (확대/삭제/재생성/다운로드/업로드/히스토리)
+│   │   ├── generation-button.tsx     # 공통 AI 생성 버튼 (스피너/진행률/중단)
 │   │   ├── content-settings.tsx       # 설정 탭
 │   │   ├── prompt-edit-dialog.tsx     # 프롬프트 미리보기/수정
 │   │   └── topic-suggestion-dialog.tsx # AI 주제 추천
@@ -102,7 +106,8 @@ src/
 │   ├── use-auto-save.ts             # 디바운스 자동저장
 │   └── use-hydration.ts             # SSR 하이드레이션 가드
 ├── lib/
-│   ├── prompt-builder.ts            # 채널별 프롬프트 빌더 (433줄)
+│   ├── ai-models.ts                 # AI 모델 상수 (텍스트/이미지/TTS 모델 중앙 관리)
+│   ├── prompt-builder.ts            # 채널별 프롬프트 빌더
 │   ├── strategy-prompt-builder.ts   # 전략 5탭 프롬프트 빌더
 │   ├── strategy-html-parser.ts      # 외부 전략 HTML → 키워드/카테고리/주제 추출
 │   ├── weekly-report-builder.ts     # 주간 보고서 HTML 생성

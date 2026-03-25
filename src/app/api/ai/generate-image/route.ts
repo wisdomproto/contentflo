@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createImageGenerator } from '@/lib/ai/image-generator';
-
-const DEFAULT_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
+import { DEFAULT_IMAGE_MODEL } from '@/lib/ai-models';
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;

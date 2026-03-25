@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import type { Project } from '@/types/database';
+import {
+  TEXT_MODELS, IMAGE_MODELS, TTS_MODELS,
+  DEFAULT_TEXT_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_TTS_MODEL,
+} from '@/lib/ai-models';
 
 interface AiModelSettings {
   text_model: string;
@@ -17,27 +21,12 @@ interface AiModelSettings {
 }
 
 const DEFAULTS: AiModelSettings = {
-  text_model: 'gemini-3-flash-preview',
-  image_model: 'gemini-3.1-flash-image-preview',
-  tts_model: 'gemini-3-flash-preview',
+  text_model: DEFAULT_TEXT_MODEL,
+  image_model: DEFAULT_IMAGE_MODEL,
+  tts_model: DEFAULT_TTS_MODEL,
   temperature: 0.7,
   max_tokens: 4096,
 };
-
-export const TEXT_MODELS = [
-  'gemini-3-flash-preview',
-  'gemini-3.1-pro-preview',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-2.5-flash',
-  'gemini-2.5-pro',
-];
-export const IMAGE_MODELS = [
-  'gemini-3.1-flash-image-preview',
-  'gemini-3-pro-image-preview',
-  'gemini-2.5-flash-image',
-  'imagen-4.0-generate-001',
-];
-const TTS_MODELS = ['gemini-3-flash-preview', 'gemini-3.1-pro-preview', 'gemini-2.5-flash'];
 
 interface AiModelSectionProps {
   project: Project;
@@ -76,7 +65,7 @@ export function AiModelSection({ project, onUpdate }: AiModelSectionProps) {
               </SelectTrigger>
               <SelectContent>
                 {TEXT_MODELS.map((m) => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                  <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -89,7 +78,7 @@ export function AiModelSection({ project, onUpdate }: AiModelSectionProps) {
               </SelectTrigger>
               <SelectContent>
                 {IMAGE_MODELS.map((m) => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                  <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -102,7 +91,7 @@ export function AiModelSection({ project, onUpdate }: AiModelSectionProps) {
               </SelectTrigger>
               <SelectContent>
                 {TTS_MODELS.map((m) => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                  <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import type { Editor } from '@tiptap/react';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,10 +10,57 @@ import {
 
 interface EditorToolbarProps {
   editor: Editor | null;
+  projectId?: string;
 }
 
-export function EditorToolbar({ editor }: EditorToolbarProps) {
+export function EditorToolbar({ editor, projectId }: EditorToolbarProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   if (!editor) return null;
+
+  const handleImageUpload = async (file: File) => {
+    if (!projectId) {
+      // Fallback: no projectId → prompt for URL
+      const url = window.prompt('이미지 URL을 입력하세요');
+      if (url) editor.chain().focus().setImage({ src: url }).run();
+      return;
+    }
+
+    try {
+      const presignRes = await fetch('/api/storage/presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          category: 'images',
+          fileName: file.name,
+          contentType: file.type,
+        }),
+      });
+      if (!presignRes.ok) throw new Error('Presign 실패');
+      const { presignedUrl, publicUrl } = await presignRes.json();
+      const uploadRes = await fetch(presignedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
+      if (!uploadRes.ok) throw new Error('R2 업로드 실패');
+      editor.chain().focus().setImage({ src: publicUrl }).run();
+    } catch {
+      // Fallback to object URL
+      const url = URL.createObjectURL(file);
+      editor.chain().focus().setImage({ src: url }).run();
+    }
+  };
+
+  const handleImageClick = () => {
+    if (projectId) {
+      fileInputRef.current?.click();
+    } else {
+      const url = window.prompt('이미지 URL을 입력하세요');
+      if (url) editor.chain().focus().setImage({ src: url }).run();
+    }
+  };
 
   const items = [
     { icon: Heading1, action: () => editor.chain().focus().toggleHeading({ level: 1 }).run(), active: editor.isActive('heading', { level: 1 }) },
@@ -28,14 +76,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
     { icon: Quote, action: () => editor.chain().focus().toggleBlockquote().run(), active: editor.isActive('blockquote') },
     { type: 'separator' as const },
     { icon: Minus, action: () => editor.chain().focus().setHorizontalRule().run(), active: false },
-    {
-      icon: ImageIcon,
-      action: () => {
-        const url = window.prompt('이미지 URL을 입력하세요');
-        if (url) editor.chain().focus().setImage({ src: url }).run();
-      },
-      active: false,
-    },
+    { icon: ImageIcon, action: handleImageClick, active: false },
   ];
 
   return (
@@ -57,6 +98,17 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           </Button>
         );
       })}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleImageUpload(file);
+          e.target.value = '';
+        }}
+      />
     </div>
   );
 }

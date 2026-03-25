@@ -12,7 +12,8 @@ import { useAiGeneration } from '@/hooks/use-ai-generation';
 import { useCardImageGeneration } from '@/hooks/use-card-image-generation';
 import { useProjectStore } from '@/stores/project-store';
 import { buildThreadsPrompt } from '@/lib/prompt-builder';
-import { Sparkles, Loader2, Copy, Check, Eye, ImageIcon } from 'lucide-react';
+import { Loader2, Copy, Check, Eye } from 'lucide-react';
+import { GenerationButton } from './generation-button';
 import type { Content, Project, ThreadsContent, ThreadsCard } from '@/types/database';
 import { generateId } from '@/lib/utils';
 
@@ -136,29 +137,16 @@ function ThreadsPanelInner({ threadsContent, content, project, hasBaseArticle, c
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           {cards.length > 0 && <Badge variant="secondary" className="text-xs">{cards.length}개 포스트</Badge>}
-          {isGenerating && (
-            <Badge variant="outline" className="text-xs gap-1 text-gray-600">
-              <Loader2 size={10} className="animate-spin" /> 생성 중...
-            </Badge>
-          )}
-          {isGeneratingImage && (
-            <Badge variant="outline" className="text-xs gap-1 text-green-600">
-              <ImageIcon size={10} /> 이미지 생성 중...
-            </Badge>
-          )}
         </div>
         <div className="flex gap-2">
-          <Button
+          <GenerationButton
+            variant="text"
+            isGenerating={isGenerating}
+            disabled={!hasBaseArticle}
             onClick={handleGenerate}
-            disabled={!hasBaseArticle || isGenerating}
-            size="sm"
-            className="gap-1.5 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white"
-          >
-            <Sparkles size={14} /> AI 생성
-          </Button>
-          {isGenerating && (
-            <Button variant="destructive" size="sm" onClick={abort}>중단</Button>
-          )}
+            onAbort={abort}
+            className={!isGenerating ? 'bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white' : undefined}
+          />
           <Button
             variant="outline"
             size="sm"

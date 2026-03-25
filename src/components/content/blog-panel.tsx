@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useMemo, useEffect } from 'react';
+import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,8 @@ import { useCardImageGeneration } from '@/hooks/use-card-image-generation';
 import { useProjectStore } from '@/stores/project-store';
 import { buildBlogPrompt, buildBlogImagePromptForCard } from '@/lib/prompt-builder';
 import { calculateNaverSeoScore, type SeoDetail } from '@/lib/seo-scorer';
-import { Sparkles, Eye, Loader2, ChevronDown, ChevronRight, ImageIcon, X, Plus } from 'lucide-react';
+import { Eye, Loader2, ChevronDown, ChevronRight, X, Plus } from 'lucide-react';
+import { GenerationButton } from './generation-button';
 import type { Content, Project, BlogContent, BlogCard } from '@/types/database';
 import type { ImportedStrategy } from '@/types/analytics';
 import { generateId, cn } from '@/lib/utils';
@@ -98,6 +99,9 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
   const [primaryKeyword, setPrimaryKeyword] = useState(existingKeywords?.primary ?? '');
   const [secondaryKeywords, setSecondaryKeywords] = useState<string[]>(existingKeywords?.secondary ?? []);
   const [newKeywordInput, setNewKeywordInput] = useState('');
+  const [newGoldenInput, setNewGoldenInput] = useState('');
+  const [customGoldenKeywords, setCustomGoldenKeywords] = useState<{ keyword: string; totalSearch: number }[]>([]);
+  const [removedGoldenKeywords, setRemovedGoldenKeywords] = useState<string[]>([]);
 
   // 기본글이 있고 아직 SEO 제목/키워드가 비어있으면 자동 세팅
   useEffect(() => {
@@ -159,12 +163,27 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
     saveKeywords(primaryKeyword, updated);
   };
 
+  // SEO auto-retry state
+  const retryCountRef = useRef(0);
+  const generateRef = useRef<(prompt: string, model: string) => void>(undefined);
+  const MAX_RETRIES = 3;
+  const SEO_THRESHOLD = 0.9; // 90%
+
+  function buildSeoFeedback(details: SeoDetail[]): string | null {
+    // 이미지 최적화 제외하고 90% 미만인 항목 수집
+    const failedItems = details
+      .filter(d => d.category !== 'image' && d.category !== 'title' && d.score < d.maxScore * SEO_THRESHOLD)
+      .map(d => `- ${d.label}: ${d.score}/${d.maxScore} (${d.message})`);
+    if (failedItems.length === 0) return null;
+    return failedItems.join('\n');
+  }
+
   // AI text generation
   const { isGenerating, generate, abort } = useAiGeneration({
     onComplete: useCallback(
       (fullText: string) => {
         try {
-          let sections: { text: string; alt?: string; caption?: string }[];
+          let sections: { text: string; alt?: string; caption?: string; image_prompt?: string }[];
           let aiSeoTitle: string | undefined;
           let aiPrimaryKw: string | undefined;
           let aiSecondaryKws: string[] | undefined;
@@ -178,7 +197,7 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
                 seo_title?: string;
                 primary_keyword?: string;
                 secondary_keywords?: string[];
-                sections?: { text: string; alt?: string; caption?: string }[];
+                sections?: { text: string; alt?: string; caption?: string; image_prompt?: string }[];
               };
               sections = parsed.sections ?? [];
               aiSeoTitle = parsed.seo_title;
@@ -216,7 +235,7 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
               url: '',
               alt: section.alt || '',
               caption: section.caption || '',
-              image_prompt: '',
+              image_prompt: section.image_prompt || '',
               image_style: '',
             },
             sort_order: i,
@@ -225,20 +244,44 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
           }));
 
           setBlogCardsForContent(blogContent.id, newCards);
+
+          // SEO 점수 체크 후 자동 재생성
+          const currentKw = aiPrimaryKw || primaryKeyword;
+          const currentSecKws = aiSecondaryKws || secondaryKeywords;
+          const seoCheck = calculateNaverSeoScore(finalTitle, newCards, { primary: currentKw, secondary: currentSecKws });
+          const feedback = buildSeoFeedback(seoCheck.details);
+
+          if (feedback && retryCountRef.current < MAX_RETRIES) {
+            retryCountRef.current += 1;
+            const retryPrompt = buildBlogPrompt({
+              project,
+              content,
+              baseArticle: getBaseArticle(content.id) ?? undefined,
+              seoTitle: finalTitle,
+              keywords: { primary: currentKw, secondary: currentSecKws },
+            });
+            const seoFixPrompt = `${retryPrompt}\n\n## ⚠️ SEO 점수 개선 필요 (재생성 ${retryCountRef.current}/${MAX_RETRIES}회)\n현재 총점: ${seoCheck.score}/100 (이미지 제외)\n아래 항목의 점수가 낮습니다. 반드시 개선하세요:\n${feedback}\n\n이전 응답의 전체 내용을 유지하되, 위 항목만 집중 개선하세요.`;
+            setTimeout(() => generateRef.current?.(seoFixPrompt, channelModels.textModel), 100);
+          } else {
+            retryCountRef.current = 0;
+          }
         } catch {
+          retryCountRef.current = 0;
           alert('블로그 섹션 파싱 실패. 다시 시도해 주세요.');
         }
       },
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [blogContent.id, seoTitle, updateBlogContent, setBlogCardsForContent]
+      [blogContent.id, seoTitle, primaryKeyword, secondaryKeywords, updateBlogContent, setBlogCardsForContent, project, content, channelModels.textModel, getBaseArticle]
     ),
     onError: useCallback((err: string) => {
+      retryCountRef.current = 0;
       alert(`AI 생성 오류: ${err}`);
     }, []),
   });
+  useEffect(() => { generateRef.current = generate; }, [generate]);
 
   // Image generation (공통 훅)
-  const { isGeneratingImage, generatingCardId, generateCardImage, generateAllImages: generateAllCardImages } = useCardImageGeneration({
+  const { isGeneratingImage, generatingCardId, imageProgress, generateCardImage, generateAllImages: generateAllCardImages } = useCardImageGeneration({
     getPrompt: (card: BlogCard) => {
       const cardContent = card.content as { image_prompt?: string; image_style?: string };
       const style = cardContent.image_style || channelModels.imageStyle || '';
@@ -311,26 +354,75 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
       keyword: k.keyword,
       totalSearch: k.totalSearch,
     })),
-  ].filter((k, i, arr) => arr.findIndex(x => x.keyword === k.keyword) === i);
+    ...customGoldenKeywords,
+  ]
+    .filter((k, i, arr) => arr.findIndex(x => x.keyword === k.keyword) === i)
+    .filter(k => !removedGoldenKeywords.includes(k.keyword));
+
+  const handleAddGoldenKeyword = () => {
+    const kw = newGoldenInput.trim();
+    if (!kw || allGoldenKeywords.some(g => g.keyword === kw)) return;
+    setCustomGoldenKeywords(prev => [...prev, { keyword: kw, totalSearch: 0 }]);
+    setRemovedGoldenKeywords(prev => prev.filter(r => r !== kw));
+    setNewGoldenInput('');
+  };
+
+  const handleRemoveGoldenKeyword = (keyword: string) => {
+    setCustomGoldenKeywords(prev => prev.filter(k => k.keyword !== keyword));
+    setRemovedGoldenKeywords(prev => [...prev, keyword]);
+  };
 
   return (
     <div className="space-y-4">
       {/* Golden keyword banner from marketing strategy */}
       {allGoldenKeywords.length > 0 && (
-        <div className="mb-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
-          <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">🥇 추천 키워드 (마케팅 전략)</div>
-          <div className="flex gap-2 flex-wrap">
-            {allGoldenKeywords.slice(0, 5).map((gk) => (
-              <button
+        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">🥇 추천 키워드 (마케팅 전략)</div>
+            <div className="flex items-center gap-1">
+              <Input
+                value={newGoldenInput}
+                onChange={(e) => setNewGoldenInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddGoldenKeyword(); } }}
+                placeholder="키워드 추가"
+                className="h-6 w-[120px] text-xs bg-white dark:bg-emerald-950"
+              />
+              <Button variant="ghost" size="sm" onClick={handleAddGoldenKeyword} className="h-6 w-6 p-0">
+                <Plus size={12} />
+              </Button>
+            </div>
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
+            {allGoldenKeywords.map((gk) => (
+              <Badge
                 key={gk.keyword}
-                onClick={() => handlePrimaryKeywordChange(gk.keyword)}
-                className="text-xs px-2 py-1 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 rounded hover:bg-emerald-200 dark:hover:bg-emerald-800 transition-colors"
+                variant="secondary"
+                className="text-xs gap-1 pr-1 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 cursor-pointer hover:bg-emerald-200 dark:hover:bg-emerald-800"
               >
-                {gk.keyword} ({gk.totalSearch.toLocaleString()}/월)
-              </button>
+                <button onClick={() => handlePrimaryKeywordChange(gk.keyword)} className="hover:underline">
+                  {gk.keyword} {gk.totalSearch > 0 ? `(${gk.totalSearch.toLocaleString()}/월)` : ''}
+                </button>
+                <button onClick={() => handleRemoveGoldenKeyword(gk.keyword)} className="hover:text-destructive ml-0.5">
+                  <X size={10} />
+                </button>
+              </Badge>
             ))}
           </div>
         </div>
+      )}
+
+      {/* Naver keyword search — above action buttons */}
+      {hasBaseArticle && (
+        <NaverKeywordPanel
+          primaryKeyword={primaryKeyword}
+          secondaryKeywords={secondaryKeywords}
+          onSetPrimary={(kw) => handlePrimaryKeywordChange(kw)}
+          onAddSecondary={(kw) => {
+            const updated = [...secondaryKeywords, kw];
+            setSecondaryKeywords(updated);
+            saveKeywords(primaryKeyword, updated);
+          }}
+        />
       )}
 
       {/* Action buttons */}
@@ -339,39 +431,22 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
           {cards.length > 0 && (
             <Badge variant="secondary" className="text-xs">{cards.length}개 섹션</Badge>
           )}
-          {isGenerating && (
-            <Badge variant="outline" className="text-xs gap-1 text-blue-600">
-              <Loader2 size={10} className="animate-spin" /> 생성 중...
-            </Badge>
-          )}
-          {isGeneratingImage && (
-            <Badge variant="outline" className="text-xs gap-1 text-green-600">
-              <ImageIcon size={10} /> 이미지 생성 중...
-            </Badge>
-          )}
         </div>
         <div className="flex gap-2">
-          <Button
+          <GenerationButton
+            variant="text"
+            isGenerating={isGenerating}
+            disabled={!hasBaseArticle}
             onClick={handleGenerate}
-            disabled={!hasBaseArticle || isGenerating}
-            size="sm"
-            className="gap-1.5 bg-green-600 hover:bg-green-700 text-white"
-          >
-            <Sparkles size={14} /> AI 생성
-          </Button>
-          {isGenerating && (
-            <Button variant="destructive" size="sm" onClick={abort}>중단</Button>
-          )}
-          <Button
+            onAbort={abort}
+          />
+          <GenerationButton
+            variant="batch-image"
+            isGenerating={isGeneratingImage}
+            disabled={cards.length === 0}
             onClick={handleGenerateAllImages}
-            disabled={cards.length === 0 || isGeneratingImage}
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-          >
-            {isGeneratingImage ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
-            전체 이미지
-          </Button>
+            progress={imageProgress}
+          />
           <Button
             variant="outline"
             size="sm"
@@ -442,16 +517,6 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
               </div>
             )}
           </div>
-          <NaverKeywordPanel
-            primaryKeyword={primaryKeyword}
-            secondaryKeywords={secondaryKeywords}
-            onSetPrimary={(kw) => handlePrimaryKeywordChange(kw)}
-            onAddSecondary={(kw) => {
-              const updated = [...secondaryKeywords, kw];
-              setSecondaryKeywords(updated);
-              saveKeywords(primaryKeyword, updated);
-            }}
-          />
           {cards.length > 0 && (
             <SeoScoreDisplay score={seoResult.score} details={seoResult.details} />
           )}

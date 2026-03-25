@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
+import { DEFAULT_STRATEGY_MODEL } from '@/lib/ai-models';
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -55,7 +56,7 @@ ${crawlContext}
 
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: DEFAULT_STRATEGY_MODEL,
       contents: prompt,
     });
 

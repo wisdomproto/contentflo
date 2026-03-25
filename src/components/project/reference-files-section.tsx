@@ -3,8 +3,10 @@
 import { useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Upload, FileText, FileImage, File, Trash2, Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { generateId } from '@/lib/utils';
+import { TEXT_MODELS, DEFAULT_ANALYSIS_MODEL } from '@/lib/ai-models';
 import type { Project, ReferenceFile } from '@/types/database';
 
 interface ReferenceFilesSectionProps {
@@ -28,6 +30,7 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
   const [isDragOver, setIsDragOver] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showSummary, setShowSummary] = useState(true);
+  const [analysisModel, setAnalysisModel] = useState(DEFAULT_ANALYSIS_MODEL);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const files: ReferenceFile[] = project.reference_files ?? [];
   const summary = project.reference_summary ?? null;
@@ -37,15 +40,20 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
 
     for (const f of Array.from(fileList)) {
       const id = generateId('ref');
-      // 텍스트 파일이면 내용 추출
+      // 서버에서 텍스트 추출 (PDF, DOCX, TXT 등)
       let extractedText: string | null = null;
-      const textTypes = ['text/plain', 'text/markdown', 'text/html', 'application/json'];
-      const textExts = ['.txt', '.md', '.markdown', '.json', '.csv'];
-      const isTextFile = textTypes.includes(f.type) || textExts.some(ext => f.name.toLowerCase().endsWith(ext));
-      if (isTextFile && f.size < 2_000_000) { // 2MB 이하
+      const extractableExts = ['.pdf', '.docx', '.doc', '.txt', '.md', '.markdown', '.csv', '.json', '.xml', '.html'];
+      const canExtract = extractableExts.some(ext => f.name.toLowerCase().endsWith(ext));
+      if (canExtract && f.size < 10_000_000) { // 10MB 이하
         try {
-          extractedText = await f.text();
-        } catch { /* ignore */ }
+          const formData = new FormData();
+          formData.append('file', f);
+          const extractRes = await fetch('/api/ai/extract-text', { method: 'POST', body: formData });
+          if (extractRes.ok) {
+            const { text } = await extractRes.json();
+            if (text && text.trim().length > 0) extractedText = text;
+          }
+        } catch { /* extraction failed — continue without text */ }
       }
 
       const fileEntry: ReferenceFile = {
@@ -119,6 +127,7 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
       name: f.name,
       content: f.extracted_text || undefined,
       url: f.url || undefined,
+      r2_key: f.r2_key || undefined,
     }));
 
     setIsAnalyzing(true);
@@ -130,6 +139,7 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
           files: fileInfos,
           brandName: project.brand_name,
           industry: project.industry,
+          model: analysisModel,
         }),
       });
 
@@ -186,18 +196,30 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
           <div className="flex items-center justify-between">
             <CardTitle>참고 자료 파일</CardTitle>
             {files.length > 0 && (
-              <Button
-                onClick={handleAnalyze}
-                disabled={isAnalyzing}
-                size="sm"
-                className="gap-1.5"
-              >
-                {isAnalyzing ? (
-                  <><Loader2 size={14} className="animate-spin" /> 분석 중...</>
-                ) : (
-                  <><Sparkles size={14} /> AI 분석 ({files.length}개 파일)</>
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Select value={analysisModel} onValueChange={(v) => { if (v) setAnalysisModel(v); }}>
+                  <SelectTrigger className="h-8 w-[200px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEXT_MODELS.map((m) => (
+                      <SelectItem key={m.id} value={m.id} className="text-xs">{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing}
+                  size="sm"
+                  className="gap-1.5"
+                >
+                  {isAnalyzing ? (
+                    <><Loader2 size={14} className="animate-spin" /> 분석 중...</>
+                  ) : (
+                    <><Sparkles size={14} /> AI 분석 ({files.length}개 파일)</>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
         </CardHeader>

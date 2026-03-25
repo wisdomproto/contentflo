@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import * as mammoth from 'mammoth';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { DEFAULT_ANALYSIS_MODEL } from '@/lib/ai-models';
 
 interface FileInfo {
   name: string;
   content?: string;
   url?: string;
+  r2_key?: string;
 }
 
 const TEXT_EXTS = ['.txt', '.md', '.markdown', '.csv', '.json', '.xml', '.html'];
@@ -51,14 +55,20 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { files, brandName, industry } = await request.json() as {
+    const { files, brandName, industry, model } = await request.json() as {
       files: FileInfo[];
       brandName?: string;
       industry?: string;
+      model?: string;
     };
 
     if (!files?.length) {
       return NextResponse.json({ error: '분석할 파일이 없습니다.' }, { status: 400 });
+    }
+
+    console.log('[analyze-references] Received', files.length, 'files');
+    for (const f of files) {
+      console.log(`  - ${f.name}: content=${f.content ? f.content.length + ' chars' : 'none'}, url=${f.url || 'none'}`);
     }
 
     // 텍스트 수집
@@ -68,8 +78,25 @@ export async function POST(request: NextRequest) {
     for (const f of files) {
       if (f.content) {
         texts.push({ name: f.name, content: f.content });
-      } else if (f.url) {
-        const extracted = await extractTextFromUrl(f.name, f.url);
+        continue;
+      }
+
+      // r2_key가 있으면 서버에서 직접 fresh presigned URL 생성
+      let fetchUrl = f.url;
+      if (f.r2_key) {
+        try {
+          const { getR2Client, getR2Bucket } = await import('@/lib/r2-client');
+          const client = getR2Client();
+          const bucket = getR2Bucket();
+          const cmd = new GetObjectCommand({ Bucket: bucket, Key: f.r2_key });
+          fetchUrl = await getSignedUrl(client, cmd, { expiresIn: 300 });
+        } catch (err) {
+          console.error(`[analyze-references] Failed to generate presigned URL for ${f.name}:`, err);
+        }
+      }
+
+      if (fetchUrl) {
+        const extracted = await extractTextFromUrl(f.name, fetchUrl);
         if (extracted && extracted.trim().length > 0) {
           texts.push({ name: f.name, content: extracted });
         } else {
@@ -124,9 +151,9 @@ ${refContent}
 모든 내용은 한국어로 작성하세요. 원문의 핵심을 놓치지 마세요.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-preview-05-20',
+      model: model || DEFAULT_ANALYSIS_MODEL,
       contents: prompt,
-      config: { maxOutputTokens: 8192 },
+      config: { maxOutputTokens: 65536 },
     });
 
     const summary = response.text ?? '';
