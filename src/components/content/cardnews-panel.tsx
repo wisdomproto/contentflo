@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CardNewsCardItem, AddSlideButton } from './cardnews-card-item';
@@ -47,10 +47,65 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
   const [hashtagInput, setHashtagInput] = useState('');
   const hashtags = igContent.hashtags ?? [];
 
+  // 해시태그 자동 세팅: 비어있으면 content.tags + 브랜드명으로 초기화
+  useEffect(() => {
+    if (hashtags.length > 0) return;
+    const tags = content.tags ?? [];
+    if (tags.length === 0) return;
+
+    const autoHashtags = tags
+      .map(t => t.replace(/\s+/g, '').replace(/^#/, ''))
+      .filter(Boolean);
+
+    // 브랜드명이 있으면 추가
+    if (project.brand_name) {
+      autoHashtags.push(project.brand_name.replace(/\s+/g, ''));
+    }
+
+    if (autoHashtags.length > 0) {
+      updateInstagramContent(igContent.id, { hashtags: autoHashtags });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [igContent.id]);
+
   const imageStyle = channelModels.imageStyle || 'Photorealistic, high quality photography, natural lighting, detailed';
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [isDraggingRef, setIsDraggingRef] = useState(false);
+  const [isUploadingRef, setIsUploadingRef] = useState(false);
   const refInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadRefImage = useCallback(async (file: File) => {
+    setIsUploadingRef(true);
+    try {
+      const presignRes = await fetch('/api/storage/presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: project.id,
+          category: 'references',
+          fileName: file.name,
+          contentType: file.type,
+          contentId: igContent.id,
+        }),
+      });
+      if (!presignRes.ok) throw new Error('Presign 실패');
+      const { presignedUrl, publicUrl } = await presignRes.json();
+      const uploadRes = await fetch(presignedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
+      if (!uploadRes.ok) throw new Error('R2 업로드 실패');
+      setReferenceImage(publicUrl);
+    } catch {
+      // Fallback to base64
+      const reader = new FileReader();
+      reader.onload = () => setReferenceImage(reader.result as string);
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingRef(false);
+    }
+  }, [project.id, igContent.id]);
 
   // Step 1: 텍스트 AI로 이미지 프롬프트 생성
   const { isGenerating: isGeneratingPrompts, generate: generatePrompts, abort: abortPrompts } = useAiGeneration({
@@ -360,32 +415,28 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
             onDrop={(e) => {
               e.preventDefault(); e.stopPropagation(); setIsDraggingRef(false);
               const file = e.dataTransfer.files[0];
-              if (file?.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = () => setReferenceImage(reader.result as string);
-                reader.readAsDataURL(file);
-              }
+              if (file?.type.startsWith('image/')) uploadRefImage(file);
             }}
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingRef(true); }}
             onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingRef(false); }}
-            onClick={() => refInputRef.current?.click()}
+            onClick={() => !isUploadingRef && refInputRef.current?.click()}
             className={cn(
               'flex-1 h-12 rounded-lg border-2 border-dashed flex items-center justify-center gap-2 cursor-pointer transition-colors',
-              isDraggingRef ? 'border-primary bg-primary/10' : 'border-muted-foreground/20 hover:border-primary/50'
+              isDraggingRef ? 'border-primary bg-primary/10' : 'border-muted-foreground/20 hover:border-primary/50',
+              isUploadingRef && 'pointer-events-none opacity-50'
             )}
           >
-            <Upload size={14} className="text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">이미지를 드래그하거나 클릭</span>
+            {isUploadingRef ? (
+              <><Loader2 size={14} className="animate-spin text-muted-foreground" /><span className="text-xs text-muted-foreground">업로드 중...</span></>
+            ) : (
+              <><Upload size={14} className="text-muted-foreground" /><span className="text-xs text-muted-foreground">이미지를 드래그하거나 클릭</span></>
+            )}
           </div>
         )}
         <input ref={refInputRef} type="file" accept="image/*" className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file?.type.startsWith('image/')) {
-              const reader = new FileReader();
-              reader.onload = () => setReferenceImage(reader.result as string);
-              reader.readAsDataURL(file);
-            }
+            if (file?.type.startsWith('image/')) uploadRefImage(file);
             e.target.value = '';
           }}
         />
