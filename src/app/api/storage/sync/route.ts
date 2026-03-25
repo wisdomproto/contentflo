@@ -24,8 +24,9 @@ export async function GET() {
     if ((err as { name?: string }).name === 'NoSuchKey') {
       return NextResponse.json({ data: null });
     }
-    console.error('[sync/GET]', err);
-    return NextResponse.json({ error: '동기화 데이터 로드 실패' }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[sync/GET]', msg);
+    return NextResponse.json({ error: `동기화 데이터 로드 실패: ${msg}` }, { status: 500 });
   }
 }
 
