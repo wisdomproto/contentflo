@@ -34,6 +34,21 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
 
     for (const f of Array.from(fileList)) {
       const id = generateId('ref');
+      // 텍스트 파일이면 내용 추출 (AI 프롬프트 참고용)
+      let extractedText: string | null = null;
+      const textTypes = ['text/plain', 'text/markdown', 'text/html', 'application/json'];
+      const textExts = ['.txt', '.md', '.markdown', '.json', '.csv'];
+      const isTextFile = textTypes.includes(f.type) || textExts.some(ext => f.name.toLowerCase().endsWith(ext));
+      if (isTextFile && f.size < 500_000) { // 500KB 이하만
+        try {
+          extractedText = await f.text();
+          // 너무 길면 앞부분만 (토큰 절약)
+          if (extractedText.length > 10_000) {
+            extractedText = extractedText.slice(0, 10_000) + '\n...(이하 생략)';
+          }
+        } catch { /* ignore */ }
+      }
+
       const fileEntry: ReferenceFile = {
         id,
         name: f.name,
@@ -42,6 +57,7 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
         added_at: new Date().toISOString(),
         url: null,
         r2_key: null,
+        extracted_text: extractedText,
       };
 
       // Upload to R2

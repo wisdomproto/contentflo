@@ -30,6 +30,7 @@ export interface ReferenceFile {
   type: string;
   url: string | null;
   r2_key: string | null;
+  extracted_text: string | null;
   added_at: string;
 }
 
