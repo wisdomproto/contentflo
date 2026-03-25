@@ -579,11 +579,13 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
             <div className="grid grid-cols-4 gap-2">
               {CARD_TEMPLATES.filter(t => t.category === activeCategory).map(t => {
                 const s = t.style;
-                const isGradient = !!s.bgGradient;
                 const bg = s.bgGradient || s.bgColor || '#1a1a2e';
                 const txtColor = s.color || '#ffffff';
                 const accent = s.accentColor;
                 const layout = s.layoutType || 'standard';
+                const align = (s.textAlign as 'left' | 'center' | 'right') || 'center';
+                // Sample image placeholder gradient per template
+                const sampleImgGrad = `linear-gradient(135deg, ${s.bgColor || '#2a2a4a'}88 0%, ${accent || '#667788'}66 50%, ${s.bgColor || '#1a1a2e'}aa 100%)`;
                 return (
                   <button
                     key={t.id}
@@ -598,70 +600,68 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
                       {/* Background */}
                       <div className="absolute inset-0" style={{ background: bg }} />
 
-                      {/* Layout-specific mini preview */}
+                      {/* Layout-specific mini preview with sample text & image */}
                       {layout === 'standard' && (
                         <div className="absolute inset-0 flex flex-col">
-                          {/* Top 40% text area */}
-                          <div className="flex-[4] flex flex-col items-center justify-center px-2 py-1.5">
-                            {accent && <div className="w-4 h-[2px] rounded mb-1" style={{ backgroundColor: accent }} />}
-                            <div className="w-[70%] h-[3px] rounded-sm mb-1" style={{ backgroundColor: txtColor, opacity: 0.9 }} />
-                            <div className="w-[50%] h-[2px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.5 }} />
+                          <div className="flex-[4] flex flex-col justify-center px-2 py-1" style={{ textAlign: align }}>
+                            {accent && <div className="h-[2px] rounded mb-1" style={{ backgroundColor: accent, width: '30%', marginLeft: align === 'center' ? 'auto' : undefined, marginRight: align === 'center' ? 'auto' : undefined }} />}
+                            <p className="leading-tight font-bold" style={{ fontSize: '6px', color: txtColor }}>SNS 마케팅</p>
+                            <p className="leading-tight mt-0.5" style={{ fontSize: '4px', color: txtColor, opacity: 0.6 }}>브랜드 성장 전략</p>
                           </div>
-                          {/* Bottom 60% image placeholder */}
-                          <div className="flex-[6] mx-1.5 mb-1.5 rounded bg-black/20 flex items-center justify-center">
-                            <ImageIcon size={10} style={{ color: txtColor, opacity: 0.3 }} />
+                          <div className="flex-[6] mx-1 mb-1 rounded-sm overflow-hidden" style={{ background: sampleImgGrad }}>
+                            <div className="w-full h-full flex items-center justify-center opacity-40">
+                              <ImageIcon size={10} style={{ color: txtColor }} />
+                            </div>
                           </div>
                         </div>
                       )}
 
                       {layout === 'text-only' && (
-                        <div className="absolute inset-0 flex flex-col justify-center px-2.5 gap-1">
-                          {accent && <div className="w-5 h-[2px] rounded" style={{ backgroundColor: accent }} />}
-                          <div className="w-[80%] h-[3px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.9 }} />
-                          <div className="w-[60%] h-[3px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.9 }} />
-                          <div className="w-[90%] h-[2px] rounded-sm mt-0.5" style={{ backgroundColor: txtColor, opacity: 0.4 }} />
-                          <div className="w-[70%] h-[2px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.4 }} />
+                        <div className="absolute inset-0 flex flex-col justify-center px-2 gap-0.5" style={{ textAlign: align }}>
+                          {accent && <div className="h-[2px] rounded" style={{ backgroundColor: accent, width: '25%', marginLeft: align === 'center' ? 'auto' : undefined, marginRight: align === 'center' ? 'auto' : undefined }} />}
+                          <p className="leading-tight font-bold" style={{ fontSize: '7px', color: txtColor }}>콘텐츠의 힘</p>
+                          <p className="leading-snug mt-0.5" style={{ fontSize: '4px', color: txtColor, opacity: 0.6 }}>좋은 콘텐츠는 고객의 마음을 움직입니다</p>
                         </div>
                       )}
 
                       {layout === 'photo-bg' && (
                         <div className="absolute inset-0">
-                          {/* Fake photo bg pattern */}
-                          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/60" />
-                          <div className="absolute inset-0 opacity-20" style={{ background: 'linear-gradient(135deg, #666 25%, transparent 25%, transparent 50%, #666 50%, #666 75%, transparent 75%)', backgroundSize: '6px 6px' }} />
-                          <div className="absolute bottom-0 left-0 right-0 p-2 flex flex-col gap-0.5">
-                            <div className="w-[75%] h-[3px] rounded-sm" style={{ backgroundColor: '#ffffff', opacity: 0.95 }} />
-                            <div className="w-[55%] h-[2px] rounded-sm" style={{ backgroundColor: '#ffffff', opacity: 0.6 }} />
+                          {/* Sample photo background */}
+                          <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #4a7c8a 0%, #2d5a6b 40%, #1a3a4a 100%)' }} />
+                          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/70" />
+                          <div className="absolute bottom-0 left-0 right-0 p-1.5" style={{ textAlign: s.textPosition === 'center' ? 'center' : 'left' }}>
+                            <p className="leading-tight font-bold" style={{ fontSize: '6px', color: '#ffffff' }}>감성 브랜딩</p>
+                            <p className="leading-tight mt-0.5" style={{ fontSize: '3.5px', color: '#ffffff', opacity: 0.7 }}>사진으로 전하는 이야기</p>
                           </div>
                         </div>
                       )}
 
                       {layout === 'split-top' && (
                         <div className="absolute inset-0 flex flex-col">
-                          {/* Top image */}
-                          <div className="flex-1 bg-black/20 flex items-center justify-center">
-                            <ImageIcon size={10} style={{ color: txtColor, opacity: 0.3 }} />
+                          <div className="flex-1 overflow-hidden" style={{ background: sampleImgGrad }}>
+                            <div className="w-full h-full flex items-center justify-center opacity-40">
+                              <ImageIcon size={8} style={{ color: txtColor }} />
+                            </div>
                           </div>
-                          {/* Bottom text */}
-                          <div className="flex-1 flex flex-col justify-center px-2 gap-0.5" style={{ background: bg }}>
-                            {accent && <div className="w-4 h-[2px] rounded" style={{ backgroundColor: accent }} />}
-                            <div className="w-[70%] h-[3px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.9 }} />
-                            <div className="w-[85%] h-[2px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.5 }} />
+                          <div className="flex-1 flex flex-col justify-center px-1.5 gap-0.5" style={{ background: bg, textAlign: align }}>
+                            {accent && <div className="h-[1.5px] rounded" style={{ backgroundColor: accent, width: '25%' }} />}
+                            <p className="leading-tight font-bold" style={{ fontSize: '5px', color: txtColor }}>매거진 스타일</p>
+                            <p className="leading-tight" style={{ fontSize: '3.5px', color: txtColor, opacity: 0.6 }}>이미지와 텍스트의 조화</p>
                           </div>
                         </div>
                       )}
 
                       {layout === 'split-left' && (
                         <div className="absolute inset-0 flex flex-row">
-                          {/* Left text */}
-                          <div className="flex-1 flex flex-col justify-center px-1.5 gap-0.5" style={{ background: bg }}>
-                            {accent && <div className="w-3 h-[2px] rounded" style={{ backgroundColor: accent }} />}
-                            <div className="w-[80%] h-[2px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.9 }} />
-                            <div className="w-[60%] h-[2px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.5 }} />
+                          <div className="flex-1 flex flex-col justify-center px-1 gap-0.5" style={{ background: bg, textAlign: align }}>
+                            {accent && <div className="h-[1.5px] rounded" style={{ backgroundColor: accent, width: '30%' }} />}
+                            <p className="leading-tight font-bold" style={{ fontSize: '4.5px', color: txtColor }}>랜드스케이프</p>
+                            <p className="leading-tight" style={{ fontSize: '3px', color: txtColor, opacity: 0.6 }}>넓은 시야의 레이아웃</p>
                           </div>
-                          {/* Right image */}
-                          <div className="flex-1 bg-black/20 flex items-center justify-center">
-                            <ImageIcon size={8} style={{ color: txtColor, opacity: 0.3 }} />
+                          <div className="flex-1 overflow-hidden" style={{ background: sampleImgGrad }}>
+                            <div className="w-full h-full flex items-center justify-center opacity-40">
+                              <ImageIcon size={8} style={{ color: txtColor }} />
+                            </div>
                           </div>
                         </div>
                       )}
