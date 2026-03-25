@@ -1,4 +1,5 @@
 // ContentFlow Database Types — PRD v2.0 기반
+import type { FunnelConfig, GA4Config, ImportedStrategy } from './analytics';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 export type ContentStatus = 'draft' | 'in_progress' | 'published';
@@ -126,6 +127,11 @@ export interface Project {
   // 참고 자료 (프로젝트 기본)
   reference_files: ReferenceFile[] | null;
   bgm_files: BgmFile[] | null;
+  // 퍼널 & 분석 설정
+  funnel_config: FunnelConfig | null;
+  ga4_config: GA4Config | null;
+  // 임포트된 마케팅 전략
+  imported_strategy: ImportedStrategy | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
