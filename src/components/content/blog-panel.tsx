@@ -17,6 +17,7 @@ import { buildBlogPrompt, buildBlogImagePromptForCard } from '@/lib/prompt-build
 import { calculateNaverSeoScore, type SeoDetail } from '@/lib/seo-scorer';
 import { Sparkles, Eye, Loader2, ChevronDown, ChevronRight, ImageIcon, X, Plus } from 'lucide-react';
 import type { Content, Project, BlogContent, BlogCard } from '@/types/database';
+import type { ImportedStrategy } from '@/types/analytics';
 import { generateId, cn } from '@/lib/utils';
 
 function SeoScoreDisplay({ score, details }: { score: number; details: SeoDetail[] }) {
@@ -76,6 +77,13 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
   const strategy = useProjectStore((s) => {
     const projectId = s.selectedProjectId;
     return projectId ? s.getStrategy(projectId) : undefined;
+  });
+
+  const importedStrategy = useProjectStore((s) => {
+    const projectId = s.selectedProjectId;
+    if (!projectId) return null;
+    const project = s.projects.find(p => p.id === projectId);
+    return (project?.imported_strategy ?? null) as ImportedStrategy | null;
   });
 
   const baseArticle = getBaseArticle(content.id);
@@ -293,14 +301,26 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
     updateBlogContent(blogContent.id, { seo_title: value || null });
   };
 
+  const importedGolden = importedStrategy?.keywords.filter(k => k.isGolden) ?? [];
+  const allGoldenKeywords = [
+    ...(strategy?.keywords?.goldenKeywords ?? []).map(gk => ({
+      keyword: gk.keyword,
+      totalSearch: gk.totalSearch,
+    })),
+    ...importedGolden.map(k => ({
+      keyword: k.keyword,
+      totalSearch: k.totalSearch,
+    })),
+  ].filter((k, i, arr) => arr.findIndex(x => x.keyword === k.keyword) === i);
+
   return (
     <div className="space-y-4">
       {/* Golden keyword banner from marketing strategy */}
-      {strategy?.keywords?.goldenKeywords && strategy.keywords.goldenKeywords.length > 0 && (
+      {allGoldenKeywords.length > 0 && (
         <div className="mb-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
           <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">🥇 추천 키워드 (마케팅 전략)</div>
           <div className="flex gap-2 flex-wrap">
-            {strategy.keywords.goldenKeywords.slice(0, 3).map((gk) => (
+            {allGoldenKeywords.slice(0, 5).map((gk) => (
               <button
                 key={gk.keyword}
                 onClick={() => handlePrimaryKeywordChange(gk.keyword)}

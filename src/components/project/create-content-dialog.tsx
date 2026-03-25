@@ -14,6 +14,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useProjectStore } from '@/stores/project-store';
+import type { ImportedStrategy, ImportedCategory, ImportedTopic } from '@/types/analytics';
+
+// Satisfy unused import lint — types are used via the cast below
+type _AnalyticsTypes = ImportedCategory | ImportedTopic;
 
 interface CreateContentDialogProps {
   open: boolean;
@@ -25,7 +29,34 @@ export function CreateContentDialog({ open, onOpenChange, projectId }: CreateCon
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [tagsInput, setTagsInput] = useState('');
+  const [selectedCategoryCode, setSelectedCategoryCode] = useState('');
+  const [selectedTopicId, setSelectedTopicId] = useState('');
+
   const createContent = useProjectStore((s) => s.createContent);
+
+  const importedStrategy = useProjectStore((s) => {
+    const projectId = s.selectedProjectId;
+    if (!projectId) return null;
+    const project = s.projects.find(p => p.id === projectId);
+    return (project?.imported_strategy ?? null) as ImportedStrategy | null;
+  });
+
+  const categories = importedStrategy?.categories ?? [];
+  const currentTopics = categories.find(c => c.code === selectedCategoryCode)?.topics.filter(t => t.status === 'new') ?? [];
+
+  const handleTopicSelect = (topicId: string) => {
+    const topic = currentTopics.find(t => t.id === topicId);
+    if (topic) {
+      setSelectedTopicId(topicId);
+      setTitle(topic.title);
+      setTagsInput(topic.keywords.join(', '));
+    }
+  };
+
+  const handleCategorySelect = (code: string) => {
+    setSelectedCategoryCode(code);
+    setSelectedTopicId('');
+  };
 
   const handleSubmit = () => {
     if (!title.trim()) return;
@@ -33,15 +64,20 @@ export function CreateContentDialog({ open, onOpenChange, projectId }: CreateCon
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
+    const effectiveCategory = selectedCategoryCode
+      ? selectedCategoryCode
+      : category.trim() || undefined;
     createContent({
       project_id: projectId,
       title: title.trim(),
-      category: category.trim() || undefined,
+      category: effectiveCategory,
       tags: tags.length > 0 ? tags : undefined,
     });
     setTitle('');
     setCategory('');
     setTagsInput('');
+    setSelectedCategoryCode('');
+    setSelectedTopicId('');
     onOpenChange(false);
   };
 
@@ -53,7 +89,13 @@ export function CreateContentDialog({ open, onOpenChange, projectId }: CreateCon
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => {
+      if (!v) {
+        setSelectedCategoryCode('');
+        setSelectedTopicId('');
+      }
+      onOpenChange(v);
+    }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>새 컨텐츠</DialogTitle>
@@ -62,6 +104,46 @@ export function CreateContentDialog({ open, onOpenChange, projectId }: CreateCon
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          {categories.length > 0 && (
+            <div className="space-y-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+              <div className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                📋 마케팅 전략에서 선택
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">카테고리</label>
+                  <select
+                    value={selectedCategoryCode}
+                    onChange={(e) => handleCategorySelect(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="">선택...</option>
+                    {categories.map(cat => (
+                      <option key={cat.code} value={cat.code}>
+                        {cat.code}. {cat.name} ({cat.topics.filter(t => t.status === 'new').length}개)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">주제</label>
+                  <select
+                    value={selectedTopicId}
+                    onChange={(e) => handleTopicSelect(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    disabled={!selectedCategoryCode}
+                  >
+                    <option value="">선택...</option>
+                    {currentTopics.map(topic => (
+                      <option key={topic.id} value={topic.id}>
+                        {topic.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="content-title">컨텐츠 제목 *</Label>
             <Input
