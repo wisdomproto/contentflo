@@ -128,6 +128,8 @@ export interface Project {
   // 참고 자료 (프로젝트 기본)
   reference_files: ReferenceFile[] | null;
   bgm_files: BgmFile[] | null;
+  // 참고 자료 AI 분석 요약
+  reference_summary: string | null;
   // 퍼널 & 분석 설정
   funnel_config: FunnelConfig | null;
   ga4_config: GA4Config | null;

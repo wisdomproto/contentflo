@@ -111,13 +111,19 @@ export function buildBaseArticlePrompt(ctx: PromptContext): string {
     sections.push(`\n## 참고 자료\n${ctx.referenceTexts.join('\n---\n')}`);
   }
 
-  // 프로젝트 참고 자료 (추출된 텍스트 포함)
-  if (project.reference_files?.length) {
+  // 프로젝트 참고 자료: AI 분석 요약이 있으면 요약 사용, 없으면 원문 텍스트 사용
+  if (project.reference_summary) {
+    sections.push(`\n## 프로젝트 참고 자료 (AI 분석 요약)\n아래 참고 자료 분석 내용을 반영하여 글을 작성하세요.\n\n${project.reference_summary}`);
+  } else if (project.reference_files?.length) {
     const filesWithText = project.reference_files.filter(f => f.extracted_text);
     const filesWithoutText = project.reference_files.filter(f => !f.extracted_text);
 
     if (filesWithText.length > 0) {
-      const refTexts = filesWithText.map(f => `### ${f.name}\n${f.extracted_text}`).join('\n\n---\n\n');
+      // 요약 없이 원문 사용 시 길이 제한
+      const refTexts = filesWithText.map(f => {
+        const text = f.extracted_text!;
+        return `### ${f.name}\n${text.length > 3000 ? text.slice(0, 3000) + '\n...(이하 생략)' : text}`;
+      }).join('\n\n---\n\n');
       sections.push(`\n## 프로젝트 참고 자료 (내용)\n아래 참고 자료의 내용을 반영하여 글을 작성하세요.\n\n${refTexts}`);
     }
     if (filesWithoutText.length > 0) {

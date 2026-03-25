@@ -1,0 +1,71 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { GoogleGenAI } from '@google/genai';
+
+export async function POST(request: NextRequest) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: 'GEMINI_API_KEY가 설정되지 않았습니다.' }, { status: 500 });
+  }
+
+  try {
+    const { texts, brandName, industry } = await request.json() as {
+      texts: { name: string; content: string }[];
+      brandName?: string;
+      industry?: string;
+    };
+
+    if (!texts?.length) {
+      return NextResponse.json({ error: '분석할 텍스트가 없습니다.' }, { status: 400 });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    const refContent = texts.map(t => `\n### 📄 ${t.name}\n${t.content}`).join('\n\n---\n\n');
+
+    const prompt = `당신은 마케팅 콘텐츠 전략가입니다. 아래 참고 자료들을 분석하여 콘텐츠 제작에 활용할 수 있는 구조화된 요약을 작성하세요.
+
+${brandName ? `브랜드: ${brandName}` : ''}
+${industry ? `업종: ${industry}` : ''}
+
+## 참고 자료 원문
+${refContent}
+
+## 요약 작성 가이드
+
+아래 형식으로 요약하세요:
+
+### 📚 자료 개요
+- 자료별 한 줄 요약 (자료명: 핵심 내용)
+
+### 🎯 핵심 메시지 (콘텐츠에 반복 활용)
+- 전문성을 보여주는 핵심 주장/데이터 5~10개
+- 각각 한 줄로, 구체적 수치나 팩트 포함
+
+### 📂 주제별 핵심 내용
+자료에서 추출한 주제별로 그룹핑하여 정리:
+- 각 주제: 핵심 포인트 3~5개 (구체적 수치, 사례, 인용구 포함)
+- 콘텐츠 제작 시 바로 활용할 수 있는 형태로
+
+### 💡 콘텐츠 앵글 추천
+- 자료 내용 기반으로 만들 수 있는 콘텐츠 앵글 5~10개
+- 각각: 주제 + 왜 효과적인지 한 줄
+
+### ⚠️ 주의사항
+- 의료/법률 등 민감한 표현이 있다면 주의할 점
+
+모든 내용은 한국어로 작성하세요. 원문의 핵심을 놓치지 마세요.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-preview-05-20',
+      contents: prompt,
+      config: { maxOutputTokens: 8192 },
+    });
+
+    const summary = response.text ?? '';
+
+    return NextResponse.json({ summary });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '분석 오류';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

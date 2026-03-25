@@ -351,6 +351,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
       api_keys: null,
       reference_files: null,
       bgm_files: null,
+      reference_summary: null,
       funnel_config: null,
       ga4_config: null,
       imported_strategy: null,

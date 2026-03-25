@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, FileImage, File, Trash2 } from 'lucide-react';
+import { Upload, FileText, FileImage, File, Trash2, Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { generateId } from '@/lib/utils';
 import type { Project, ReferenceFile } from '@/types/database';
 
@@ -26,26 +26,25 @@ function getFileIcon(type: string) {
 
 export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSectionProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showSummary, setShowSummary] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const files: ReferenceFile[] = project.reference_files ?? [];
+  const summary = project.reference_summary ?? null;
 
   const addFiles = useCallback(async (fileList: FileList) => {
     const newFiles: ReferenceFile[] = [];
 
     for (const f of Array.from(fileList)) {
       const id = generateId('ref');
-      // 텍스트 파일이면 내용 추출 (AI 프롬프트 참고용)
+      // 텍스트 파일이면 내용 추출
       let extractedText: string | null = null;
       const textTypes = ['text/plain', 'text/markdown', 'text/html', 'application/json'];
       const textExts = ['.txt', '.md', '.markdown', '.json', '.csv'];
       const isTextFile = textTypes.includes(f.type) || textExts.some(ext => f.name.toLowerCase().endsWith(ext));
-      if (isTextFile && f.size < 500_000) { // 500KB 이하만
+      if (isTextFile && f.size < 2_000_000) { // 2MB 이하
         try {
           extractedText = await f.text();
-          // 너무 길면 앞부분만 (토큰 절약)
-          if (extractedText.length > 10_000) {
-            extractedText = extractedText.slice(0, 10_000) + '\n...(이하 생략)';
-          }
         } catch { /* ignore */ }
       }
 
@@ -113,6 +112,41 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
     onUpdate({ reference_files: updated.length > 0 ? updated : null });
   };
 
+  // AI 분석: 텍스트가 추출된 파일들을 분석하여 요약 생성
+  const handleAnalyze = async () => {
+    const textsToAnalyze = files
+      .filter(f => f.extracted_text)
+      .map(f => ({ name: f.name, content: f.extracted_text! }));
+
+    if (textsToAnalyze.length === 0) {
+      alert('분석할 텍스트 파일이 없습니다. txt, md 등 텍스트 파일을 업로드하세요.');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const res = await fetch('/api/ai/analyze-references', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          texts: textsToAnalyze,
+          brandName: project.brand_name,
+          industry: project.industry,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      onUpdate({ reference_summary: data.summary });
+      setShowSummary(true);
+    } catch (err) {
+      alert(`분석 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -141,16 +175,33 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
     }
   };
 
+  const textFileCount = files.filter(f => f.extracted_text).length;
+
   return (
     <div className="space-y-6">
       <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
-        프로젝트 참고 자료를 등록하면 이 프로젝트의 모든 컨텐츠에 기본으로 포함됩니다.
-        각 컨텐츠 설정에서 개별 참고 자료를 추가할 수도 있습니다.
+        참고 자료를 업로드하고 <strong>AI 분석</strong>을 실행하면, 자료의 핵심 내용을 요약하여 콘텐츠 생성 시 자동으로 활용합니다.
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>참고 자료 파일</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>참고 자료 파일</CardTitle>
+            {textFileCount > 0 && (
+              <Button
+                onClick={handleAnalyze}
+                disabled={isAnalyzing}
+                size="sm"
+                className="gap-1.5"
+              >
+                {isAnalyzing ? (
+                  <><Loader2 size={14} className="animate-spin" /> 분석 중...</>
+                ) : (
+                  <><Sparkles size={14} /> AI 분석 ({textFileCount}개 파일)</>
+                )}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Drop zone */}
@@ -169,14 +220,14 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
             <p className="text-sm font-medium">
               {isDragOver ? '여기에 놓으세요' : '파일을 드래그하거나 클릭하여 선택'}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">PDF, DOCX, MD, TXT, HWP, 이미지 등 (다중 파일 가능)</p>
+            <p className="text-xs text-muted-foreground mt-1">TXT, MD, PDF, DOCX, HWP 등 (다중 파일 가능)</p>
             <input
               ref={fileInputRef}
               type="file"
               multiple
               className="hidden"
               onChange={handleFileSelect}
-              accept=".pdf,.docx,.doc,.md,.txt,.hwp,.png,.jpg,.jpeg,.gif,.webp"
+              accept=".pdf,.docx,.doc,.md,.txt,.hwp,.png,.jpg,.jpeg,.gif,.webp,.csv,.json"
             />
           </div>
 
@@ -192,7 +243,14 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
                       <Icon size={18} className="shrink-0 text-muted-foreground" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm truncate">{file.name}</p>
-                        <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(file.size)}
+                          {file.extracted_text && (
+                            <span className="ml-2 text-emerald-600">
+                              텍스트 추출됨 ({(file.extracted_text.length / 1000).toFixed(1)}K자)
+                            </span>
+                          )}
+                        </p>
                       </div>
                       <Button
                         variant="ghost"
@@ -214,6 +272,46 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
           )}
         </CardContent>
       </Card>
+
+      {/* AI 분석 요약 결과 */}
+      {summary && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles size={16} className="text-amber-500" />
+                AI 분석 요약
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSummary(!showSummary)}
+                >
+                  {showSummary ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing || textFileCount === 0}
+                  className="gap-1"
+                >
+                  {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                  재분석
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          {showSummary && (
+            <CardContent>
+              <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed whitespace-pre-wrap">
+                {summary}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
     </div>
   );
 }
