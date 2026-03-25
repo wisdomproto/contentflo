@@ -180,7 +180,7 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
   return (
     <div className="space-y-6">
       <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
-        참고 자료를 업로드하고 <strong>AI 분석</strong>을 실행하면, 자료의 핵심 내용을 요약하여 콘텐츠 생성 시 자동으로 활용합니다.
+        참고 자료(책, 문서 등)를 모두 올린 후 <strong>AI 분석</strong> 버튼을 누르세요. 전체 자료를 통합 분석하여 중복 제거 + 주제별 요약을 만들고, 콘텐츠 생성 시 자동으로 활용합니다.
       </div>
 
       <Card>
@@ -246,8 +246,8 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
                         <p className="text-xs text-muted-foreground">
                           {formatFileSize(file.size)}
                           {file.extracted_text && (
-                            <span className="ml-2 text-emerald-600">
-                              텍스트 추출됨 ({(file.extracted_text.length / 1000).toFixed(1)}K자)
+                            <span className="ml-2 text-muted-foreground/70">
+                              · 읽기 가능
                             </span>
                           )}
                         </p>
