@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
+interface FileInfo {
+  name: string;
+  content?: string;  // 이미 추출된 텍스트
+  url?: string;      // R2 public URL (서버에서 fetch)
+}
+
+const TEXT_EXTS = ['.txt', '.md', '.markdown', '.csv', '.json', '.xml', '.html'];
+
 export async function POST(request: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -8,14 +16,42 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { texts, brandName, industry } = await request.json() as {
-      texts: { name: string; content: string }[];
+    const { files, brandName, industry } = await request.json() as {
+      files: FileInfo[];
       brandName?: string;
       industry?: string;
     };
 
-    if (!texts?.length) {
-      return NextResponse.json({ error: '분석할 텍스트가 없습니다.' }, { status: 400 });
+    if (!files?.length) {
+      return NextResponse.json({ error: '분석할 파일이 없습니다.' }, { status: 400 });
+    }
+
+    // 텍스트 수집: content가 있으면 사용, 없으면 URL에서 서버사이드 fetch
+    const texts: { name: string; content: string }[] = [];
+
+    for (const f of files) {
+      if (f.content) {
+        texts.push({ name: f.name, content: f.content });
+      } else if (f.url) {
+        const isText = TEXT_EXTS.some(ext => f.name.toLowerCase().endsWith(ext));
+        if (isText) {
+          try {
+            const res = await fetch(f.url);
+            if (res.ok) {
+              const text = await res.text();
+              if (text.length > 0) {
+                texts.push({ name: f.name, content: text });
+              }
+            }
+          } catch { /* skip */ }
+        }
+      }
+    }
+
+    if (texts.length === 0) {
+      return NextResponse.json({
+        error: '분석할 텍스트를 찾을 수 없습니다. txt, md 등 텍스트 파일을 업로드하세요.',
+      }, { status: 400 });
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -63,7 +99,7 @@ ${refContent}
 
     const summary = response.text ?? '';
 
-    return NextResponse.json({ summary });
+    return NextResponse.json({ summary, analyzedFiles: texts.length });
   } catch (error) {
     const message = error instanceof Error ? error.message : '분석 오류';
     return NextResponse.json({ error: message }, { status: 500 });

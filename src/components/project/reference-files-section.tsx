@@ -114,32 +114,12 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
 
   // AI 분석: 텍스트가 추출된 파일들을 분석하여 요약 생성
   const handleAnalyze = async () => {
-    // extracted_text가 있는 파일 + R2 URL에서 텍스트 다운로드 시도
-    const textsToAnalyze: { name: string; content: string }[] = [];
-
-    for (const f of files) {
-      if (f.extracted_text) {
-        textsToAnalyze.push({ name: f.name, content: f.extracted_text });
-      } else if (f.url) {
-        // R2에서 텍스트 파일 다운로드 시도
-        const textExts = ['.txt', '.md', '.markdown', '.csv', '.json'];
-        const isTextExt = textExts.some(ext => f.name.toLowerCase().endsWith(ext));
-        if (isTextExt) {
-          try {
-            const res = await fetch(f.url);
-            if (res.ok) {
-              const text = await res.text();
-              textsToAnalyze.push({ name: f.name, content: text });
-            }
-          } catch { /* skip */ }
-        }
-      }
-    }
-
-    if (textsToAnalyze.length === 0) {
-      alert('분석할 텍스트 파일이 없습니다.\ntxt, md 등 텍스트 파일을 삭제 후 다시 업로드하세요.');
-      return;
-    }
+    // 파일 메타데이터를 서버에 전달 (서버가 R2에서 텍스트 fetch)
+    const fileInfos = files.map(f => ({
+      name: f.name,
+      content: f.extracted_text || undefined,
+      url: f.url || undefined,
+    }));
 
     setIsAnalyzing(true);
     try {
@@ -147,7 +127,7 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          texts: textsToAnalyze,
+          files: fileInfos,
           brandName: project.brand_name,
           industry: project.industry,
         }),
