@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import type { Project, Content, ContentStatus, BaseArticle, BlogContent, BlogCard, InstagramContent, InstagramCard, ThreadsContent, ThreadsCard, YoutubeContent, YoutubeCard } from '@/types/database';
 import type { MarketingStrategy, StrategyInput, GenerationStatus, StrategyTab } from '@/types/strategy';
+import type { ImportedStrategy } from '@/types/analytics';
 import { generateId } from '@/lib/utils';
 
 // IndexedDB storage adapter (localStorage 5MB 제한 해결)
@@ -129,6 +130,9 @@ interface ProjectState {
   updateStrategyTab: (strategyId: string, tab: StrategyTab, data: unknown) => void;
   updateStrategyStatus: (strategyId: string, status: Partial<GenerationStatus>) => void;
   deleteStrategy: (projectId: string) => void;
+  importStrategy: (projectId: string, data: ImportedStrategy) => void;
+  clearImportedStrategy: (projectId: string) => void;
+  getImportedStrategy: (projectId: string) => ImportedStrategy | null;
 
   // Channel model helpers
   getChannelModels: (projectId: string, channel: string) => { textModel: string; imageModel: string; aspectRatio: string; imageStyle: string };
@@ -1082,6 +1086,27 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
     set((state) => ({
       strategies: state.strategies.filter((s) => s.projectId !== projectId),
     }));
+  },
+
+  importStrategy: (projectId, data) => {
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId ? { ...p, imported_strategy: data, updated_at: new Date().toISOString() } : p
+      ),
+    }));
+  },
+
+  clearImportedStrategy: (projectId) => {
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId ? { ...p, imported_strategy: null, updated_at: new Date().toISOString() } : p
+      ),
+    }));
+  },
+
+  getImportedStrategy: (projectId) => {
+    const project = get().projects.find(p => p.id === projectId);
+    return (project?.imported_strategy as ImportedStrategy | null) ?? null;
   },
 
   // Channel model helpers
