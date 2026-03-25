@@ -10,6 +10,8 @@ SNS 마케팅 콘텐츠를 AI로 생성하고 관리하는 웹 플랫폼. 하나
 - **에디터**: TipTap (StarterKit + Image + Placeholder)
 - **AI**: Google Gemini (`@google/genai` SDK, SSE 스트리밍 + 이미지 생성)
 - **UI**: shadcn/ui + Tailwind CSS 4 + Lucide Icons
+- **차트**: Recharts (GA4 대시보드)
+- **분석**: @google-analytics/data (GA4 Data API)
 - **DnD**: @dnd-kit (카드 정렬)
 - **패키지 매니저**: npm
 
@@ -35,6 +37,10 @@ src/
 │       ├── ai/strategy/crawl/        # URL 크롤링 분석 (cheerio)
 │       ├── ai/strategy/suggest-keywords/    # AI 키워드 추천
 │       ├── ai/strategy/suggest-competitors/ # AI 경쟁사 탐색
+│       ├── analytics/overview/        # GA4 종합 지표 (세션, 이탈률, 페이지뷰)
+│       ├── analytics/traffic/        # GA4 트래픽 소스/채널
+│       ├── analytics/top-pages/      # GA4 인기 페이지
+│       ├── strategy/import-html/     # 외부 전략 HTML 파싱 → 키워드/카테고리/주제 추출
 │       ├── naver/keywords/           # 네이버 키워드 검색
 │       └── naver/keywords/trend/     # 네이버 DataLab 트렌드
 ├── components/
@@ -71,10 +77,19 @@ src/
 │   │   ├── channel-tab.tsx            # ③ 채널·퍼널 전략
 │   │   ├── content-tab.tsx            # ④ 콘텐츠·주제
 │   │   ├── topic-table.tsx            # 주제 목록 테이블 (필터)
-│   │   └── kpi-tab.tsx                # ⑤ KPI·액션플랜
+│   │   ├── kpi-tab.tsx                # ⑤ KPI·액션플랜
+│   │   └── strategy-import-dialog.tsx # 외부 전략 HTML 임포트 다이얼로그
+│   ├── analytics/           # GA4 사이트 분석 대시보드
+│   │   ├── analytics-dashboard.tsx    # 메인 대시보드 (7일/30일 토글)
+│   │   ├── overview-cards.tsx         # 핵심 지표 카드 (세션/사용자/PV/이탈률)
+│   │   ├── pageviews-chart.tsx        # 일별 페이지뷰 라인 차트 (Recharts)
+│   │   ├── traffic-chart.tsx          # 트래픽 소스 바 차트
+│   │   └── top-pages-table.tsx        # 인기 페이지 TOP 10
+│   ├── report/              # 보고서
+│   │   └── weekly-report-dialog.tsx   # 주간 보고서 생성/미리보기/다운로드
 │   ├── editor/             # TipTap 에디터 + 툴바
-│   ├── project/            # 프로젝트 설정 (브랜드, 마케터, API키 등)
-│   ├── sidebar/            # 프로젝트 트리 사이드바 (마케팅 전략 고정 항목 포함)
+│   ├── project/            # 프로젝트 설정 (브랜드, 마케터, API키, 퍼널·분석 등)
+│   ├── sidebar/            # 프로젝트 트리 사이드바 (전략/분석/보고서 고정 항목)
 │   ├── layout/             # 헤더
 │   └── ui/                 # shadcn/ui 컴포넌트
 ├── stores/
@@ -83,11 +98,14 @@ src/
 │   ├── use-ai-generation.ts         # SSE 텍스트 스트리밍
 │   ├── use-strategy-generation.ts   # 전략 생성 SSE 스트리밍 (멀티탭)
 │   ├── use-image-generation.ts      # 배치 이미지 생성 + progress
+│   ├── use-analytics.ts             # GA4 데이터 fetching 훅
 │   ├── use-auto-save.ts             # 디바운스 자동저장
 │   └── use-hydration.ts             # SSR 하이드레이션 가드
 ├── lib/
 │   ├── prompt-builder.ts            # 채널별 프롬프트 빌더 (433줄)
 │   ├── strategy-prompt-builder.ts   # 전략 5탭 프롬프트 빌더
+│   ├── strategy-html-parser.ts      # 외부 전략 HTML → 키워드/카테고리/주제 추출
+│   ├── weekly-report-builder.ts     # 주간 보고서 HTML 생성
 │   ├── seo-scorer.ts                # 네이버 SEO 점수 계산
 │   ├── utils.ts                     # generateId, countWords, cn
 │   └── ai/                          # 이미지 생성 서비스 (Strategy Pattern)
@@ -102,7 +120,10 @@ src/
 
 ## 데이터 모델 (3-tier, 1:N 관계)
 ```
-Project (프로젝트 설정 + API 키)
+Project (프로젝트 설정 + API 키 + 퍼널 + GA4)
+ ├── funnel_config (메인 퍼널/웹사이트 URL + 전환 목표)
+ ├── ga4_config (GA4 서비스 계정 인증)
+ ├── imported_strategy (외부 전략 HTML에서 추출된 키워드/카테고리/주제)
  ├── MarketingStrategy (1:1, AI 마케팅 전략)
  │    ├── input: StrategyInput
  │    ├── overview / keywords / channelStrategy / contentStrategy / kpiAction
@@ -146,6 +167,32 @@ Project (프로젝트 설정 + API 키)
 ### 생성 방식
 - 전체 생성 (5탭 순차 SSE) + 탭별 재생성 (수정 지시 입력)
 - 네이버 API → URL 크롤링 → AI 순차 생성
+
+### 외부 전략 임포트
+- 사이드바 "마케팅 전략" 옆 Upload 아이콘으로 HTML 전략 파일 임포트
+- cheerio로 파싱 → 키워드 DB, 카테고리 (A~E 순환), 주제 목록 추출
+- `imported_strategy`로 프로젝트에 저장
+- 새 콘텐츠 생성 시 카테고리/주제 드롭다운으로 자동 추천
+- 블로그 패널에서 임포트된 황금키워드를 기존 전략 키워드와 병합 표시
+
+## 퍼널 · GA4 분석 · 주간 보고서
+
+### 메인 퍼널 설정
+- 프로젝트 설정 > 퍼널·분석 탭에서 웹사이트 URL, 전환 목표, 퍼널 단계 등록
+- 모든 마케팅 채널의 최종 착지점 관리
+
+### GA4 사이트 분석 대시보드
+- 프로젝트 설정에서 GA4 서비스 계정 인증 (Property ID + 이메일 + 비공개 키)
+- 사이드바 "사이트 분석" 클릭 → 대시보드 표시
+- 7일/30일 기간 토글, 새로고침 버튼
+- 4개 핵심 지표 카드 (세션/사용자/PV/이탈률)
+- 일별 페이지뷰 라인 차트 + 트래픽 소스 바 차트 (Recharts)
+- 인기 페이지 TOP 10 테이블
+
+### 주간 보고서
+- 사이드바 "주간 보고서" 클릭 → 다이얼로그
+- GA4 데이터(7일) + 콘텐츠 발행 현황 + 키워드 현황 결합
+- HTML 보고서 생성 → iframe 미리보기 + 다운로드
 
 ## Outer+Inner 패널 패턴
 모든 채널 패널은 동일한 구조:
@@ -219,11 +266,11 @@ ChannelPanel (Outer)
 - `NAVER_DATALAB_CLIENT_ID`: 네이버 DataLab Client ID (선택)
 - `NAVER_DATALAB_CLIENT_SECRET`: 네이버 DataLab Client Secret (선택)
 - 네이버 검색광고 / Instagram / Threads / YouTube / Perplexity 키: 프로젝트 설정 > API 키 탭에서 관리
+- GA4 서비스 계정 인증: 프로젝트 설정 > 퍼널·분석 탭에서 관리 (Property ID + 이메일 + 비공개 키)
 
 ## 미구현/스텁 목록
 - `/api/ai/factcheck`, `/api/ai/tts` — 스텁 라우트
 - `/api/publish/*` — Instagram, Threads, YouTube 발행 API
-- `/api/analytics/*` — 분석 API
 - `src/app/(auth)/` — 로그인/회원가입 (라우트만 존재)
 - `src/lib/gemini/`, `src/lib/naver/`, `src/lib/perplexity/` — 빈 디렉토리
 - `src/components/cards/`, `src/components/media/`, `src/components/preview/` — 빈 디렉토리
