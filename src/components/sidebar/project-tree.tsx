@@ -4,9 +4,10 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   FolderOpen, FolderClosed, FileText, Plus, ChevronRight, ChevronDown,
   MoreHorizontal, Search, Filter, ArrowUpDown, Pencil, Settings, Copy,
-  Trash2, PanelLeftClose, PanelLeft, Target, BarChart3, Upload,
+  Trash2, PanelLeftClose, PanelLeft, Target, BarChart3, Upload, FileBarChart,
 } from 'lucide-react';
 import { StrategyImportDialog } from '@/components/strategy/strategy-import-dialog';
+import { WeeklyReportDialog } from '@/components/report/weekly-report-dialog';
 import { useProjectStore } from '@/stores/project-store';
 import { cn } from '@/lib/utils';
 import type { Content } from '@/types/database';
@@ -133,6 +134,7 @@ function ProjectItem({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.name);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
   const renameRef = useRef<HTMLInputElement>(null);
   const { selectProject, updateProject, deleteProject, duplicateProject, openProjectSettings, openStrategy, showStrategy, openAnalytics, showAnalytics } = useProjectStore();
 
@@ -224,6 +226,13 @@ function ProjectItem({
         />
       )}
 
+      {showReportDialog && (
+        <WeeklyReportDialog
+          projectId={project.id}
+          onClose={() => setShowReportDialog(false)}
+        />
+      )}
+
       {expanded && (
         <div className="ml-4 pl-2 border-l border-border">
           {/* 마케팅 전략 + 임포트 */}
@@ -258,6 +267,14 @@ function ProjectItem({
           >
             <BarChart3 size={14} className="shrink-0 text-blue-600" />
             <span className="flex-1 text-left truncate font-medium">사이트 분석</span>
+          </button>
+          {/* 주간 보고서 */}
+          <button
+            onClick={() => setShowReportDialog(true)}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors hover:bg-accent"
+          >
+            <FileBarChart size={14} className="shrink-0 text-amber-600" />
+            <span className="flex-1 text-left truncate font-medium">주간 보고서</span>
           </button>
           {contents.map((content) => (
             <ContentItem
