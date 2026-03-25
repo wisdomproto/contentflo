@@ -49,7 +49,22 @@ export function CreateContentDialog({ open, onOpenChange, projectId }: CreateCon
     if (topic) {
       setSelectedTopicId(topicId);
       setTitle(topic.title);
-      setTagsInput(topic.keywords.join(', '));
+
+      // 임포트된 키워드 DB에서 주제 키워드와 매칭되는 고검색량 키워드를 메인으로 배치
+      const importedKeywords = importedStrategy?.keywords ?? [];
+      const topicKws = topic.keywords;
+
+      // 주제 키워드 중 임포트 DB에 있는 것을 검색량 순으로 정렬
+      const matched = topicKws
+        .map(kw => {
+          const found = importedKeywords.find(ik =>
+            ik.keyword === kw || kw.includes(ik.keyword) || ik.keyword.includes(kw)
+          );
+          return found ? { keyword: found.keyword, totalSearch: found.totalSearch } : { keyword: kw, totalSearch: 0 };
+        })
+        .sort((a, b) => b.totalSearch - a.totalSearch);
+
+      setTagsInput(matched.map(m => m.keyword).join(', '));
     }
   };
 
