@@ -77,13 +77,21 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
   });
 
   const applyGlobalStyle = (updates: Partial<CardTextStyle>) => {
-    const next = { ...globalStyle, ...updates };
+    // When applying a full template (has layoutType), reset conflicting properties
+    const isFullTemplate = 'layoutType' in updates;
+    const resets: Partial<CardTextStyle> = isFullTemplate ? {
+      bgGradient: undefined,
+      accentColor: undefined,
+      textPosition: undefined,
+      aspectRatio: undefined,
+    } : {};
+    const next = { ...globalStyle, ...resets, ...updates };
     setGlobalStyle(next);
     // 모든 카드에 적용
     for (const card of cards) {
       const existing = (card.text_style ?? {}) as CardTextStyle;
       updateInstagramCard(card.id, {
-        text_style: { ...existing, ...next },
+        text_style: { ...existing, ...resets, ...next },
       });
     }
   };
@@ -584,8 +592,45 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
                 const accent = s.accentColor;
                 const layout = s.layoutType || 'standard';
                 const align = (s.textAlign as 'left' | 'center' | 'right') || 'center';
-                // Sample image placeholder gradient per template
-                const sampleImgGrad = `linear-gradient(135deg, ${s.bgColor || '#2a2a4a'}88 0%, ${accent || '#667788'}66 50%, ${s.bgColor || '#1a1a2e'}aa 100%)`;
+
+                {/* Mini landscape SVG for image areas */}
+                const sampleImageSvg = (
+                  <svg viewBox="0 0 80 60" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+                    <defs>
+                      <linearGradient id={`sky-${t.id}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#87CEEB" />
+                        <stop offset="100%" stopColor="#E0F0FF" />
+                      </linearGradient>
+                    </defs>
+                    <rect width="80" height="60" fill={`url(#sky-${t.id})`} />
+                    <circle cx="62" cy="14" r="8" fill="#FFD93D" opacity="0.9" />
+                    <ellipse cx="20" cy="12" rx="14" ry="5" fill="white" opacity="0.6" />
+                    <ellipse cx="55" cy="10" rx="10" ry="3.5" fill="white" opacity="0.4" />
+                    <path d="M0 60 L0 35 Q20 20 35 32 Q45 25 55 30 Q65 22 80 28 L80 60 Z" fill="#4A8C5C" />
+                    <path d="M0 60 L0 42 Q15 35 30 40 Q50 32 65 38 Q75 35 80 37 L80 60 Z" fill="#3A7C4C" />
+                    <path d="M0 60 L0 48 Q25 42 40 47 Q55 43 70 46 L80 45 L80 60 Z" fill="#2D6A3F" />
+                  </svg>
+                );
+
+                const sampleCitySvg = (
+                  <svg viewBox="0 0 80 60" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+                    <rect width="80" height="60" fill="#1a1a2e" />
+                    <rect x="5" y="25" width="8" height="35" rx="1" fill="#2a2a4e" />
+                    <rect x="15" y="15" width="10" height="45" rx="1" fill="#333366" />
+                    <rect x="27" y="20" width="7" height="40" rx="1" fill="#2a2a4e" />
+                    <rect x="36" y="10" width="12" height="50" rx="1" fill="#3a3a6e" />
+                    <rect x="50" y="22" width="9" height="38" rx="1" fill="#2a2a4e" />
+                    <rect x="61" y="18" width="8" height="42" rx="1" fill="#333366" />
+                    <rect x="71" y="28" width="7" height="32" rx="1" fill="#2a2a4e" />
+                    {[8,18,20,30,39,42,45,53,57,64,67,74].map((x,i) => (
+                      <rect key={i} x={x} y={15 + (i % 5) * 8} width="2" height="2" fill="#FFD93D" opacity="0.6" />
+                    ))}
+                    <circle cx="65" cy="8" r="4" fill="#FFD93D" opacity="0.15" />
+                  </svg>
+                );
+
+                const imgArea = layout === 'photo-bg' ? sampleCitySvg : (t.id.includes('dark') || t.id.includes('black') || t.id.includes('neon') ? sampleCitySvg : sampleImageSvg);
+
                 return (
                   <button
                     key={t.id}
@@ -608,10 +653,8 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
                             <p className="leading-tight font-bold" style={{ fontSize: '6px', color: txtColor }}>SNS 마케팅</p>
                             <p className="leading-tight mt-0.5" style={{ fontSize: '4px', color: txtColor, opacity: 0.6 }}>브랜드 성장 전략</p>
                           </div>
-                          <div className="flex-[6] mx-1 mb-1 rounded-sm overflow-hidden" style={{ background: sampleImgGrad }}>
-                            <div className="w-full h-full flex items-center justify-center opacity-40">
-                              <ImageIcon size={10} style={{ color: txtColor }} />
-                            </div>
+                          <div className="flex-[6] mx-1 mb-1 rounded-sm overflow-hidden">
+                            {imgArea}
                           </div>
                         </div>
                       )}
@@ -620,15 +663,14 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
                         <div className="absolute inset-0 flex flex-col justify-center px-2 gap-0.5" style={{ textAlign: align }}>
                           {accent && <div className="h-[2px] rounded" style={{ backgroundColor: accent, width: '25%', marginLeft: align === 'center' ? 'auto' : undefined, marginRight: align === 'center' ? 'auto' : undefined }} />}
                           <p className="leading-tight font-bold" style={{ fontSize: '7px', color: txtColor }}>콘텐츠의 힘</p>
-                          <p className="leading-snug mt-0.5" style={{ fontSize: '4px', color: txtColor, opacity: 0.6 }}>좋은 콘텐츠는 고객의 마음을 움직입니다</p>
+                          <p className="leading-snug mt-0.5" style={{ fontSize: '4px', color: txtColor, opacity: 0.6 }}>좋은 콘텐츠는 고객의<br/>마음을 움직입니다</p>
                         </div>
                       )}
 
                       {layout === 'photo-bg' && (
                         <div className="absolute inset-0">
-                          {/* Sample photo background */}
-                          <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #4a7c8a 0%, #2d5a6b 40%, #1a3a4a 100%)' }} />
-                          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/70" />
+                          <div className="absolute inset-0">{imgArea}</div>
+                          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/20 to-black/70" />
                           <div className="absolute bottom-0 left-0 right-0 p-1.5" style={{ textAlign: s.textPosition === 'center' ? 'center' : 'left' }}>
                             <p className="leading-tight font-bold" style={{ fontSize: '6px', color: '#ffffff' }}>감성 브랜딩</p>
                             <p className="leading-tight mt-0.5" style={{ fontSize: '3.5px', color: '#ffffff', opacity: 0.7 }}>사진으로 전하는 이야기</p>
@@ -638,10 +680,8 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
 
                       {layout === 'split-top' && (
                         <div className="absolute inset-0 flex flex-col">
-                          <div className="flex-1 overflow-hidden" style={{ background: sampleImgGrad }}>
-                            <div className="w-full h-full flex items-center justify-center opacity-40">
-                              <ImageIcon size={8} style={{ color: txtColor }} />
-                            </div>
+                          <div className="flex-1 overflow-hidden">
+                            {imgArea}
                           </div>
                           <div className="flex-1 flex flex-col justify-center px-1.5 gap-0.5" style={{ background: bg, textAlign: align }}>
                             {accent && <div className="h-[1.5px] rounded" style={{ backgroundColor: accent, width: '25%' }} />}
@@ -656,12 +696,10 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
                           <div className="flex-1 flex flex-col justify-center px-1 gap-0.5" style={{ background: bg, textAlign: align }}>
                             {accent && <div className="h-[1.5px] rounded" style={{ backgroundColor: accent, width: '30%' }} />}
                             <p className="leading-tight font-bold" style={{ fontSize: '4.5px', color: txtColor }}>랜드스케이프</p>
-                            <p className="leading-tight" style={{ fontSize: '3px', color: txtColor, opacity: 0.6 }}>넓은 시야의 레이아웃</p>
+                            <p className="leading-tight" style={{ fontSize: '3px', color: txtColor, opacity: 0.6 }}>넓은 시야의 구성</p>
                           </div>
-                          <div className="flex-1 overflow-hidden" style={{ background: sampleImgGrad }}>
-                            <div className="w-full h-full flex items-center justify-center opacity-40">
-                              <ImageIcon size={8} style={{ color: txtColor }} />
-                            </div>
+                          <div className="flex-1 overflow-hidden">
+                            {imgArea}
                           </div>
                         </div>
                       )}
