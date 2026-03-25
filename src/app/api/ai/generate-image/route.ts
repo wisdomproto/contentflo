@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
       mimeType: result.mimeType,
     });
   } catch (err) {
+    console.error('[generate-image] Error:', err);
     const msg = err instanceof Error ? err.message : '이미지 생성 중 오류가 발생했습니다.';
     return NextResponse.json({ error: msg }, { status: 500 });
   }

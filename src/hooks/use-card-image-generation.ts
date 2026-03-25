@@ -32,7 +32,7 @@ export interface UseCardImageGenerationReturn {
   isGeneratingImage: boolean;
   generatingCardId: string | null;
   imageProgress: ImageGenerationProgress;
-  generateCardImage: (cardId: string, cards: any[]) => Promise<void>;
+  generateCardImage: (cardId: string, cards: any[], isBatch?: boolean) => Promise<void>;
   generateAllImages: (cards: any[]) => Promise<void>;
   abort: () => void;
 }
@@ -45,7 +45,7 @@ export function useCardImageGeneration(config: CardImageConfig): UseCardImageGen
   configRef.current = config;
 
   const generateCardImage = useCallback(
-    async (cardId: string, cards: any[]) => {
+    async (cardId: string, cards: any[], isBatch = false) => {
       const cfg = configRef.current;
       const card = cards.find((c: any) => c.id === cardId);
       if (!card) return;
@@ -100,7 +100,8 @@ export function useCardImageGeneration(config: CardImageConfig): UseCardImageGen
           cfg.saveResult(cardId, savedUrl, prompt);
         }
       } catch (err) {
-        alert(`이미지 생성 오류: ${(err as Error).message}`);
+        if (!isBatch) alert(`이미지 생성 오류: ${(err as Error).message}`);
+        throw err;
       } finally {
         setGeneratingCardId(null);
       }
@@ -115,11 +116,19 @@ export function useCardImageGeneration(config: CardImageConfig): UseCardImageGen
       const targets = cards.filter(c => !cfg.shouldSkip?.(c));
       const total = targets.length;
       if (total === 0) return;
+      const failed: number[] = [];
       setBatchProgress({ current: 0, total });
       for (let i = 0; i < targets.length; i++) {
         setBatchProgress({ current: i, total });
-        await generateCardImage(targets[i].id, cards);
+        try {
+          await generateCardImage(targets[i].id, cards, true);
+        } catch {
+          failed.push(i + 1);
+        }
         setBatchProgress({ current: i + 1, total });
+      }
+      if (failed.length > 0) {
+        alert(`이미지 생성 완료 (${total - failed.length}/${total} 성공)\n실패한 씬: ${failed.join(', ')}번`);
       }
     },
     [generateCardImage]
