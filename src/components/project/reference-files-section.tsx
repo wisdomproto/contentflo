@@ -114,12 +114,30 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
 
   // AI 분석: 텍스트가 추출된 파일들을 분석하여 요약 생성
   const handleAnalyze = async () => {
-    const textsToAnalyze = files
-      .filter(f => f.extracted_text)
-      .map(f => ({ name: f.name, content: f.extracted_text! }));
+    // extracted_text가 있는 파일 + R2 URL에서 텍스트 다운로드 시도
+    const textsToAnalyze: { name: string; content: string }[] = [];
+
+    for (const f of files) {
+      if (f.extracted_text) {
+        textsToAnalyze.push({ name: f.name, content: f.extracted_text });
+      } else if (f.url) {
+        // R2에서 텍스트 파일 다운로드 시도
+        const textExts = ['.txt', '.md', '.markdown', '.csv', '.json'];
+        const isTextExt = textExts.some(ext => f.name.toLowerCase().endsWith(ext));
+        if (isTextExt) {
+          try {
+            const res = await fetch(f.url);
+            if (res.ok) {
+              const text = await res.text();
+              textsToAnalyze.push({ name: f.name, content: text });
+            }
+          } catch { /* skip */ }
+        }
+      }
+    }
 
     if (textsToAnalyze.length === 0) {
-      alert('분석할 텍스트 파일이 없습니다. txt, md 등 텍스트 파일을 업로드하세요.');
+      alert('분석할 텍스트 파일이 없습니다.\ntxt, md 등 텍스트 파일을 삭제 후 다시 업로드하세요.');
       return;
     }
 
@@ -190,15 +208,14 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
             {files.length > 0 && (
               <Button
                 onClick={handleAnalyze}
-                disabled={isAnalyzing || textFileCount === 0}
+                disabled={isAnalyzing}
                 size="sm"
                 className="gap-1.5"
-                title={textFileCount === 0 ? '분석 가능한 텍스트 파일이 없습니다. txt, md 파일을 업로드하세요.' : undefined}
               >
                 {isAnalyzing ? (
                   <><Loader2 size={14} className="animate-spin" /> 분석 중...</>
                 ) : (
-                  <><Sparkles size={14} /> AI 분석{textFileCount > 0 ? ` (${textFileCount}개 파일)` : ''}</>
+                  <><Sparkles size={14} /> AI 분석 ({files.length}개 파일)</>
                 )}
               </Button>
             )}
@@ -295,7 +312,7 @@ export function ReferenceFilesSection({ project, onUpdate }: ReferenceFilesSecti
                   variant="outline"
                   size="sm"
                   onClick={handleAnalyze}
-                  disabled={isAnalyzing || textFileCount === 0}
+                  disabled={isAnalyzing || files.length === 0}
                   className="gap-1"
                 >
                   {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
