@@ -15,7 +15,7 @@ import { base64ToBlob } from '@/hooks/use-r2-upload';
 import { useProjectStore } from '@/stores/project-store';
 import { buildCardNewsImagePromptsPrompt } from '@/lib/prompt-builder';
 
-import { Eye, Loader2, Hash, X, ImageIcon, Download, Upload, RefreshCw } from 'lucide-react';
+import { Eye, Loader2, Hash, X, ImageIcon, Download, Upload, RefreshCw, ChevronDown } from 'lucide-react';
 import { GenerationButton } from './generation-button';
 import type { Content, Project, InstagramContent, InstagramCard, BlogCard } from '@/types/database';
 import { generateId, cn } from '@/lib/utils';
@@ -541,8 +541,227 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
     updateInstagramContent(igContent.id, { hashtags: newTags });
   };
 
+  // Template section collapse state
+  const [isTemplateOpen, setIsTemplateOpen] = useState(true);
+  const [activeCategory, setActiveCategory] = useState<string>('solid');
+
   return (
     <div className="space-y-4">
+      {/* Template presets — collapsible, at the top */}
+      <div className="rounded-lg border border-border bg-muted/30 overflow-hidden">
+        <button
+          onClick={() => setIsTemplateOpen(!isTemplateOpen)}
+          className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/50 transition-colors"
+        >
+          <h3 className="text-xs font-semibold">템플릿</h3>
+          <ChevronDown size={14} className={cn('text-muted-foreground transition-transform', isTemplateOpen && 'rotate-180')} />
+        </button>
+        {isTemplateOpen && (
+          <div className="px-3 pb-3 space-y-3">
+            {/* Category tabs */}
+            <div className="flex gap-1">
+              {TEMPLATE_CATEGORIES.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
+                  className={cn(
+                    'px-2 py-1 rounded text-[10px] font-medium transition-colors',
+                    activeCategory === cat.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                  )}
+                >
+                  {cat.icon} {cat.label}
+                </button>
+              ))}
+            </div>
+            {/* Template grid with rich previews */}
+            <div className="grid grid-cols-4 gap-2">
+              {CARD_TEMPLATES.filter(t => t.category === activeCategory).map(t => {
+                const s = t.style;
+                const isGradient = !!s.bgGradient;
+                const bg = s.bgGradient || s.bgColor || '#1a1a2e';
+                const txtColor = s.color || '#ffffff';
+                const accent = s.accentColor;
+                const layout = s.layoutType || 'standard';
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => applyGlobalStyle(t.style)}
+                    className="rounded-lg border border-border overflow-hidden hover:ring-2 hover:ring-primary transition-all group"
+                    title={t.name}
+                  >
+                    <div
+                      className="relative overflow-hidden"
+                      style={{ aspectRatio: '4/5' }}
+                    >
+                      {/* Background */}
+                      <div className="absolute inset-0" style={{ background: bg }} />
+
+                      {/* Layout-specific mini preview */}
+                      {layout === 'standard' && (
+                        <div className="absolute inset-0 flex flex-col">
+                          {/* Top 40% text area */}
+                          <div className="flex-[4] flex flex-col items-center justify-center px-2 py-1.5">
+                            {accent && <div className="w-4 h-[2px] rounded mb-1" style={{ backgroundColor: accent }} />}
+                            <div className="w-[70%] h-[3px] rounded-sm mb-1" style={{ backgroundColor: txtColor, opacity: 0.9 }} />
+                            <div className="w-[50%] h-[2px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.5 }} />
+                          </div>
+                          {/* Bottom 60% image placeholder */}
+                          <div className="flex-[6] mx-1.5 mb-1.5 rounded bg-black/20 flex items-center justify-center">
+                            <ImageIcon size={10} style={{ color: txtColor, opacity: 0.3 }} />
+                          </div>
+                        </div>
+                      )}
+
+                      {layout === 'text-only' && (
+                        <div className="absolute inset-0 flex flex-col justify-center px-2.5 gap-1">
+                          {accent && <div className="w-5 h-[2px] rounded" style={{ backgroundColor: accent }} />}
+                          <div className="w-[80%] h-[3px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.9 }} />
+                          <div className="w-[60%] h-[3px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.9 }} />
+                          <div className="w-[90%] h-[2px] rounded-sm mt-0.5" style={{ backgroundColor: txtColor, opacity: 0.4 }} />
+                          <div className="w-[70%] h-[2px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.4 }} />
+                        </div>
+                      )}
+
+                      {layout === 'photo-bg' && (
+                        <div className="absolute inset-0">
+                          {/* Fake photo bg pattern */}
+                          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/60" />
+                          <div className="absolute inset-0 opacity-20" style={{ background: 'linear-gradient(135deg, #666 25%, transparent 25%, transparent 50%, #666 50%, #666 75%, transparent 75%)', backgroundSize: '6px 6px' }} />
+                          <div className="absolute bottom-0 left-0 right-0 p-2 flex flex-col gap-0.5">
+                            <div className="w-[75%] h-[3px] rounded-sm" style={{ backgroundColor: '#ffffff', opacity: 0.95 }} />
+                            <div className="w-[55%] h-[2px] rounded-sm" style={{ backgroundColor: '#ffffff', opacity: 0.6 }} />
+                          </div>
+                        </div>
+                      )}
+
+                      {layout === 'split-top' && (
+                        <div className="absolute inset-0 flex flex-col">
+                          {/* Top image */}
+                          <div className="flex-1 bg-black/20 flex items-center justify-center">
+                            <ImageIcon size={10} style={{ color: txtColor, opacity: 0.3 }} />
+                          </div>
+                          {/* Bottom text */}
+                          <div className="flex-1 flex flex-col justify-center px-2 gap-0.5" style={{ background: bg }}>
+                            {accent && <div className="w-4 h-[2px] rounded" style={{ backgroundColor: accent }} />}
+                            <div className="w-[70%] h-[3px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.9 }} />
+                            <div className="w-[85%] h-[2px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.5 }} />
+                          </div>
+                        </div>
+                      )}
+
+                      {layout === 'split-left' && (
+                        <div className="absolute inset-0 flex flex-row">
+                          {/* Left text */}
+                          <div className="flex-1 flex flex-col justify-center px-1.5 gap-0.5" style={{ background: bg }}>
+                            {accent && <div className="w-3 h-[2px] rounded" style={{ backgroundColor: accent }} />}
+                            <div className="w-[80%] h-[2px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.9 }} />
+                            <div className="w-[60%] h-[2px] rounded-sm" style={{ backgroundColor: txtColor, opacity: 0.5 }} />
+                          </div>
+                          {/* Right image */}
+                          <div className="flex-1 bg-black/20 flex items-center justify-center">
+                            <ImageIcon size={8} style={{ color: txtColor, opacity: 0.3 }} />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Aspect ratio badge */}
+                      {s.aspectRatio && s.aspectRatio !== '4:5' && (
+                        <span className="absolute top-0.5 right-0.5 text-[5px] font-mono px-0.5 rounded bg-black/50 text-white/80">
+                          {s.aspectRatio}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[8px] text-center py-1 bg-muted/50 truncate px-1 font-medium">{t.name}</p>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Inline style adjustments */}
+            <h3 className="text-xs font-semibold pt-1">스타일 조정</h3>
+            {/* Row 1: font color + bg color */}
+            <div className="flex gap-4 text-[10px]">
+              <div className="space-y-1 flex-1">
+                <span className="text-muted-foreground">글자색</span>
+                <div className="flex gap-1 items-center flex-wrap">
+                  {['#ffffff', '#000000', '#f8f8f8', '#333333', '#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff922b', '#cc5de8'].map(c => (
+                    <button key={c} onClick={() => applyGlobalStyle({ color: c })}
+                      className="w-5 h-5 rounded-full border transition-transform hover:scale-110"
+                      style={{ backgroundColor: c, borderColor: globalStyle.color === c ? 'hsl(var(--primary))' : c === '#ffffff' ? '#ccc' : 'transparent', boxShadow: globalStyle.color === c ? '0 0 0 2px hsl(var(--primary))' : undefined }}
+                    />
+                  ))}
+                  <label className="relative cursor-pointer">
+                    <div className="w-5 h-5 rounded-full border border-border bg-gradient-to-br from-red-500 via-green-500 to-blue-500 hover:scale-110 transition-transform" />
+                    <input type="color" value={globalStyle.color ?? '#ffffff'} onChange={e => applyGlobalStyle({ color: e.target.value })} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  </label>
+                </div>
+              </div>
+              <div className="space-y-1 flex-1">
+                <span className="text-muted-foreground">배경색</span>
+                <div className="flex gap-1 items-center flex-wrap">
+                  {['#000000', '#1a1a2e', '#0f3460', '#ffffff', '#2d6a4f', '#533483', '#264653', '#e76f51'].map(c => (
+                    <button key={c} onClick={() => applyGlobalStyle({ bgColor: c })}
+                      className="w-5 h-5 rounded-full border transition-transform hover:scale-110"
+                      style={{ backgroundColor: c, borderColor: (globalStyle.bgColor ?? '#000000') === c ? 'hsl(var(--primary))' : c === '#000000' ? '#555' : 'transparent', boxShadow: (globalStyle.bgColor ?? '#000000') === c ? '0 0 0 2px hsl(var(--primary))' : undefined }}
+                    />
+                  ))}
+                  <label className="relative cursor-pointer">
+                    <div className="w-5 h-5 rounded-full border border-border bg-gradient-to-br from-red-500 via-green-500 to-blue-500 hover:scale-110 transition-transform" />
+                    <input type="color" value={globalStyle.bgColor ?? '#000000'} onChange={e => applyGlobalStyle({ bgColor: e.target.value })} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  </label>
+                </div>
+              </div>
+            </div>
+            {/* Row 2: toggles + sliders */}
+            <div className="flex items-center gap-3 text-[10px] flex-wrap">
+              <button
+                onClick={() => applyGlobalStyle({ strokeWidth: globalStyle.strokeWidth ? 0 : 1 })}
+                className={`px-2 py-0.5 rounded border border-border ${globalStyle.strokeWidth ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+              >
+                글자 테두리
+              </button>
+              <div className="flex items-center gap-1 flex-1 min-w-[100px]">
+                <span className="text-muted-foreground whitespace-nowrap">간격</span>
+                <input type="range" min={0} max={30} step={2} value={globalStyle.headlineBodyGap ?? 4}
+                  onChange={e => applyGlobalStyle({ headlineBodyGap: Number(e.target.value) })}
+                  className="flex-1 h-1 accent-primary" />
+                <span className="w-5 text-right">{globalStyle.headlineBodyGap ?? 4}</span>
+              </div>
+            </div>
+            {/* Row 3: font sizes + alignment */}
+            <div className="flex items-center gap-3 text-[10px] flex-wrap">
+              <label className="flex items-center gap-1">
+                <span className="text-muted-foreground whitespace-nowrap">헤더</span>
+                <input type="number" min={10} max={60} value={globalStyle.headlineFontSize ?? 20}
+                  onChange={e => applyGlobalStyle({ headlineFontSize: Number(e.target.value) })}
+                  className="w-12 px-1 py-0.5 rounded border border-border bg-transparent text-center" />
+                <span className="text-muted-foreground">px</span>
+              </label>
+              <label className="flex items-center gap-1">
+                <span className="text-muted-foreground whitespace-nowrap">본문</span>
+                <input type="number" min={8} max={40} value={globalStyle.bodyFontSize ?? 13}
+                  onChange={e => applyGlobalStyle({ bodyFontSize: Number(e.target.value) })}
+                  className="w-12 px-1 py-0.5 rounded border border-border bg-transparent text-center" />
+                <span className="text-muted-foreground">px</span>
+              </label>
+              <div className="flex gap-0.5 ml-2">
+                {(['left', 'center', 'right'] as const).map(align => (
+                  <button
+                    key={align}
+                    onClick={() => applyGlobalStyle({ textAlign: align })}
+                    className={`px-2 py-0.5 rounded border border-border ${(globalStyle.textAlign ?? 'center') === align ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                  >
+                    {align === 'left' ? '←' : align === 'center' ? '↔' : '→'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Action buttons */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
@@ -715,128 +934,6 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
               progress={cardnewsBatchProgress}
               label="이미지 생성"
             />
-          </div>
-        </div>
-      )}
-
-      {/* Template presets + Global card style */}
-      {cards.length > 0 && (
-        <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
-          <h3 className="text-xs font-semibold">템플릿</h3>
-          {TEMPLATE_CATEGORIES.map(cat => {
-            const templates = CARD_TEMPLATES.filter(t => t.category === cat.id);
-            if (templates.length === 0) return null;
-            return (
-              <div key={cat.id} className="space-y-1.5">
-                <p className="text-[10px] font-medium text-muted-foreground">{cat.icon} {cat.label}</p>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {templates.map(t => (
-                    <button
-                      key={t.id}
-                      onClick={() => applyGlobalStyle(t.style)}
-                      className="rounded-md border border-border overflow-hidden hover:ring-2 hover:ring-primary transition-all"
-                      title={t.name}
-                    >
-                      <div
-                        className="aspect-square relative"
-                        style={{ background: t.style.bgGradient || t.preview.bg }}
-                      >
-                        {t.preview.accent && (
-                          <div className="absolute top-1 left-1 w-3 h-0.5 rounded" style={{ backgroundColor: t.preview.accent }} />
-                        )}
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <p className="text-[7px] font-bold" style={{ color: t.preview.text }}>Aa</p>
-                        </div>
-                        {t.style.aspectRatio && t.style.aspectRatio !== '4:5' && (
-                          <span className="absolute bottom-0.5 right-0.5 text-[5px] font-mono px-0.5 rounded bg-black/40 text-white/80">
-                            {t.style.aspectRatio}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[7px] text-center py-0.5 bg-muted/50 truncate px-0.5">{t.name}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-          <h3 className="text-xs font-semibold pt-2">스타일 조정</h3>
-          {/* Row 1: font color + bg color */}
-          <div className="flex gap-4 text-[10px]">
-            <div className="space-y-1 flex-1">
-              <span className="text-muted-foreground">글자색</span>
-              <div className="flex gap-1 items-center flex-wrap">
-                {['#ffffff', '#000000', '#f8f8f8', '#333333', '#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff922b', '#cc5de8'].map(c => (
-                  <button key={c} onClick={() => applyGlobalStyle({ color: c })}
-                    className="w-5 h-5 rounded-full border transition-transform hover:scale-110"
-                    style={{ backgroundColor: c, borderColor: globalStyle.color === c ? 'hsl(var(--primary))' : c === '#ffffff' ? '#ccc' : 'transparent', boxShadow: globalStyle.color === c ? '0 0 0 2px hsl(var(--primary))' : undefined }}
-                  />
-                ))}
-                <label className="relative cursor-pointer">
-                  <div className="w-5 h-5 rounded-full border border-border bg-gradient-to-br from-red-500 via-green-500 to-blue-500 hover:scale-110 transition-transform" />
-                  <input type="color" value={globalStyle.color ?? '#ffffff'} onChange={e => applyGlobalStyle({ color: e.target.value })} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                </label>
-              </div>
-            </div>
-            <div className="space-y-1 flex-1">
-              <span className="text-muted-foreground">배경색</span>
-              <div className="flex gap-1 items-center flex-wrap">
-                {['#000000', '#1a1a2e', '#0f3460', '#ffffff', '#2d6a4f', '#533483', '#264653', '#e76f51'].map(c => (
-                  <button key={c} onClick={() => applyGlobalStyle({ bgColor: c })}
-                    className="w-5 h-5 rounded-full border transition-transform hover:scale-110"
-                    style={{ backgroundColor: c, borderColor: (globalStyle.bgColor ?? '#000000') === c ? 'hsl(var(--primary))' : c === '#000000' ? '#555' : 'transparent', boxShadow: (globalStyle.bgColor ?? '#000000') === c ? '0 0 0 2px hsl(var(--primary))' : undefined }}
-                  />
-                ))}
-                <label className="relative cursor-pointer">
-                  <div className="w-5 h-5 rounded-full border border-border bg-gradient-to-br from-red-500 via-green-500 to-blue-500 hover:scale-110 transition-transform" />
-                  <input type="color" value={globalStyle.bgColor ?? '#000000'} onChange={e => applyGlobalStyle({ bgColor: e.target.value })} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                </label>
-              </div>
-            </div>
-          </div>
-          {/* Row 2: toggles + sliders */}
-          <div className="flex items-center gap-3 text-[10px] flex-wrap">
-            <button
-              onClick={() => applyGlobalStyle({ strokeWidth: globalStyle.strokeWidth ? 0 : 1 })}
-              className={`px-2 py-0.5 rounded border border-border ${globalStyle.strokeWidth ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-            >
-              글자 테두리
-            </button>
-            <div className="flex items-center gap-1 flex-1 min-w-[100px]">
-              <span className="text-muted-foreground whitespace-nowrap">간격</span>
-              <input type="range" min={0} max={30} step={2} value={globalStyle.headlineBodyGap ?? 4}
-                onChange={e => applyGlobalStyle({ headlineBodyGap: Number(e.target.value) })}
-                className="flex-1 h-1 accent-primary" />
-              <span className="w-5 text-right">{globalStyle.headlineBodyGap ?? 4}</span>
-            </div>
-          </div>
-          {/* Row 3: font sizes + alignment */}
-          <div className="flex items-center gap-3 text-[10px] flex-wrap">
-            <label className="flex items-center gap-1">
-              <span className="text-muted-foreground whitespace-nowrap">헤더</span>
-              <input type="number" min={10} max={60} value={globalStyle.headlineFontSize ?? 20}
-                onChange={e => applyGlobalStyle({ headlineFontSize: Number(e.target.value) })}
-                className="w-12 px-1 py-0.5 rounded border border-border bg-transparent text-center" />
-              <span className="text-muted-foreground">px</span>
-            </label>
-            <label className="flex items-center gap-1">
-              <span className="text-muted-foreground whitespace-nowrap">본문</span>
-              <input type="number" min={8} max={40} value={globalStyle.bodyFontSize ?? 13}
-                onChange={e => applyGlobalStyle({ bodyFontSize: Number(e.target.value) })}
-                className="w-12 px-1 py-0.5 rounded border border-border bg-transparent text-center" />
-              <span className="text-muted-foreground">px</span>
-            </label>
-            <div className="flex gap-0.5 ml-2">
-              {(['left', 'center', 'right'] as const).map(align => (
-                <button
-                  key={align}
-                  onClick={() => applyGlobalStyle({ textAlign: align })}
-                  className={`px-2 py-0.5 rounded border border-border ${(globalStyle.textAlign ?? 'center') === align ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-                >
-                  {align === 'left' ? '←' : align === 'center' ? '↔' : '→'}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       )}
