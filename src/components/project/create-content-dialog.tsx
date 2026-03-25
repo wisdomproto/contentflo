@@ -58,6 +58,8 @@ export function CreateContentDialog({ open, onOpenChange, projectId }: CreateCon
     setSelectedTopicId('');
   };
 
+  const updateContent = useProjectStore((s) => s.updateContent);
+
   const handleSubmit = () => {
     if (!title.trim()) return;
     const tags = tagsInput
@@ -73,6 +75,21 @@ export function CreateContentDialog({ open, onOpenChange, projectId }: CreateCon
       category: effectiveCategory,
       tags: tags.length > 0 ? tags : undefined,
     });
+
+    // 주제를 골랐으면 content.topic에 주제 정보 저장 → BaseArticle 자동 생성 트리거
+    if (selectedTopicId) {
+      const topic = currentTopics.find(t => t.id === selectedTopicId);
+      if (topic) {
+        // 방금 생성된 content의 id를 가져오기 (마지막으로 추가된 content)
+        const contents = useProjectStore.getState().contents;
+        const newContent = contents[contents.length - 1];
+        if (newContent) {
+          const topicText = `${topic.title}\n\n앵글: ${topic.angle ?? ''}\n키워드: ${topic.keywords.join(', ')}`;
+          updateContent(newContent.id, { topic: topicText });
+        }
+      }
+    }
+
     setTitle('');
     setCategory('');
     setTagsInput('');
