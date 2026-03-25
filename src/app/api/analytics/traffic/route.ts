@@ -3,7 +3,11 @@ import { BetaAnalyticsDataClient } from '@google-analytics/data';
 
 export async function POST(request: NextRequest) {
   try {
-    const { propertyId, clientEmail, privateKey, period = '30d' } = await request.json();
+    const body = await request.json();
+    const propertyId = body.propertyId || process.env.GA4_PROPERTY_ID || '';
+    const clientEmail = body.clientEmail || process.env.GA4_CLIENT_EMAIL || '';
+    const privateKey = body.privateKey || process.env.GA4_PRIVATE_KEY || '';
+    const period = body.period || '30d';
 
     if (!propertyId || !clientEmail || !privateKey) {
       return NextResponse.json({ error: 'GA4 설정이 필요합니다' }, { status: 400 });
