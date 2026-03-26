@@ -283,5 +283,8 @@ ChannelPanel (Outer)
 
 ## 영상 파이프라인 로드맵 (Phase 11)
 이미지→영상(Grok/Veo) → TTS(ElevenLabs/Gemini) → 자막 싱크 → ffmpeg 합성
-- 현재: 씬별 이미지 생성 완료 (Vrew 스타일 UI)
+- 현재: 씬별 이미지 생성 완료 (Vrew 스타일 UI), 이미지/영상 프롬프트 분리
+- `buildYoutubeImagePrompt`: 정지 이미지용 (subtitle_text + section_type 분위기)
+- `buildYoutubeVideoPrompt`: 영상 생성용 (screen_direction + narration + 모션 힌트)
+- YoutubeCard.video_prompt 필드 추가, 대본 생성 시 이미지/영상 프롬프트 자동 생성
 - 다음: 이미지→영상 API 연동, TTS API 연동, 자막 타임스탬프 매핑, 영상 합성

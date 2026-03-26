@@ -550,6 +550,10 @@ export function buildYoutubePrompt(ctx: PromptContext & { youtubeContent?: Youtu
   return sections.join('\n');
 }
 
+/**
+ * 유튜브 씬별 **이미지** 생성 프롬프트.
+ * screen_direction(영상 편집 지시)이 아닌, 정지 이미지에 적합한 시각적 묘사를 생성.
+ */
 export function buildYoutubeImagePrompt(
   project: Project,
   card: YoutubeCard,
@@ -560,21 +564,80 @@ export function buildYoutubeImagePrompt(
 
   parts.push(`${style}.`);
 
-  if (card.screen_direction) {
-    parts.push(`Scene: ${card.screen_direction}`);
+  // subtitle_text가 씬의 핵심 주제를 가장 간결하게 담고 있음
+  if (card.subtitle_text) {
+    parts.push(`Subject: ${card.subtitle_text}`);
   }
 
-  if (card.narration_text) {
-    const summary = card.narration_text.slice(0, 200);
-    parts.push(`Context: ${summary}`);
+  // section_type에 따른 이미지 분위기 힌트
+  const moodMap: Record<string, string> = {
+    hook: 'Eye-catching, dramatic, attention-grabbing composition',
+    intro: 'Clean, welcoming, professional establishing shot',
+    main: 'Detailed, informative, clear visual explanation',
+    example: 'Real-world scenario, demonstration, practical illustration',
+    summary: 'Overview, key takeaway, clean summary visual',
+    cta: 'Warm, inviting, call-to-action mood, engaging',
+  };
+  if (card.section_type && moodMap[card.section_type]) {
+    parts.push(moodMap[card.section_type]);
   }
 
   if (project.youtube_image_style_prompt) {
     parts.push(project.youtube_image_style_prompt);
   }
 
-  parts.push('Wide angle, 16:9 composition, suitable for YouTube video. No text or watermarks in the image.');
+  parts.push('Wide angle, 16:9 composition, suitable for YouTube video thumbnail/scene. No text or watermarks in the image.');
   parts.push('Korean context: any text shown must be in Korean (한글). People should be East Asian / Korean appearance.');
+
+  return parts.join('\n');
+}
+
+/**
+ * 유튜브 씬별 **영상** 생성 프롬프트.
+ * screen_direction(화면 디렉션)을 기반으로 모션/동작이 포함된 영상 지시를 생성.
+ */
+export function buildYoutubeVideoPrompt(
+  project: Project,
+  card: YoutubeCard,
+  imageStyle: string
+): string {
+  const parts: string[] = [];
+  const style = imageStyle || 'Cinematic, professional video production';
+
+  parts.push(`${style}.`);
+
+  if (card.screen_direction) {
+    parts.push(`Scene direction: ${card.screen_direction}`);
+  }
+
+  if (card.narration_text) {
+    const summary = card.narration_text.slice(0, 150);
+    parts.push(`Narration context: ${summary}`);
+  }
+
+  if (card.subtitle_text) {
+    parts.push(`On-screen text: ${card.subtitle_text}`);
+  }
+
+  // section_type에 따른 영상 모션 힌트
+  const motionMap: Record<string, string> = {
+    hook: 'Fast-paced, dynamic camera movement, quick cuts',
+    intro: 'Slow zoom in, smooth establishing shot, steady camera',
+    main: 'Medium paced, mix of close-ups and wide shots, b-roll transitions',
+    example: 'Screen recording style, step-by-step demonstration, highlight animations',
+    summary: 'Gentle zoom out, recap montage, clean transitions',
+    cta: 'Upbeat, animated elements, subscribe button animation, bright ending',
+  };
+  if (card.section_type && motionMap[card.section_type]) {
+    parts.push(`Motion: ${motionMap[card.section_type]}`);
+  }
+
+  if (project.youtube_image_style_prompt) {
+    parts.push(project.youtube_image_style_prompt);
+  }
+
+  parts.push('16:9 video composition. Smooth camera movement, professional production quality.');
+  parts.push('Korean context: any text overlay must be in Korean (한글). People should be East Asian / Korean appearance.');
 
   return parts.join('\n');
 }

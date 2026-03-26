@@ -969,6 +969,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
       subtitle_text: null,
       image_url: null,
       image_prompt: null,
+      video_prompt: null,
       sort_order: sortOrder,
       created_at: now,
       updated_at: now,

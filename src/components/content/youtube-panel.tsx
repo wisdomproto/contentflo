@@ -13,7 +13,7 @@ import { YoutubePreviewDialog } from './youtube-preview-dialog';
 import { useAiGeneration } from '@/hooks/use-ai-generation';
 import { useCardImageGeneration } from '@/hooks/use-card-image-generation';
 import { useProjectStore } from '@/stores/project-store';
-import { buildYoutubePrompt, buildYoutubeImagePrompt } from '@/lib/prompt-builder';
+import { buildYoutubePrompt, buildYoutubeImagePrompt, buildYoutubeVideoPrompt } from '@/lib/prompt-builder';
 import {
   Loader2, Copy, Check, Eye, Clock, ImageIcon,
   ChevronLeft, ChevronRight, ChevronDown
@@ -101,19 +101,28 @@ function YoutubePanelInner({ youtubeContent, content, project, hasBaseArticle, c
           }
 
           const now = new Date().toISOString();
-          const newCards: YoutubeCard[] = parsed.sections.map((sec, i) => ({
-            id: generateId('yc'),
-            youtube_content_id: youtubeContent.id,
-            section_type: sec.section_type || 'main',
-            narration_text: sec.narration_text || '',
-            screen_direction: sec.screen_direction || '',
-            subtitle_text: sec.subtitle_text ?? null,
-            image_url: null,
-            image_prompt: null,
-            sort_order: i,
-            created_at: now,
-            updated_at: now,
-          }));
+          const newCards: YoutubeCard[] = parsed.sections.map((sec, i) => {
+            const tempCard = {
+              section_type: sec.section_type || 'main',
+              narration_text: sec.narration_text || '',
+              screen_direction: sec.screen_direction || '',
+              subtitle_text: sec.subtitle_text ?? null,
+            } as YoutubeCard;
+            return {
+              id: generateId('yc'),
+              youtube_content_id: youtubeContent.id,
+              section_type: tempCard.section_type,
+              narration_text: tempCard.narration_text,
+              screen_direction: tempCard.screen_direction,
+              subtitle_text: tempCard.subtitle_text,
+              image_url: null,
+              image_prompt: buildYoutubeImagePrompt(project, tempCard, channelModels.imageStyle),
+              video_prompt: buildYoutubeVideoPrompt(project, tempCard, channelModels.imageStyle),
+              sort_order: i,
+              created_at: now,
+              updated_at: now,
+            };
+          });
 
           setYoutubeCardsForContent(youtubeContent.id, newCards);
           if (newCards.length > 0) setSelectedCardId(newCards[0].id);
@@ -121,7 +130,7 @@ function YoutubePanelInner({ youtubeContent, content, project, hasBaseArticle, c
           alert('대본 파싱 실패. 다시 시도해 주세요.');
         }
       },
-      [youtubeContent.id, setYoutubeCardsForContent, updateYoutubeContent]
+      [youtubeContent.id, setYoutubeCardsForContent, updateYoutubeContent, project, channelModels.imageStyle]
     ),
     onError: useCallback((err: string) => {
       alert(`AI 생성 오류: ${err}`);
@@ -422,7 +431,7 @@ function YoutubePanelInner({ youtubeContent, content, project, hasBaseArticle, c
               <textarea
                 value={selectedCard.image_prompt ?? ''}
                 onChange={(e) => handleCardUpdate(selectedCard.id, { image_prompt: e.target.value })}
-                placeholder="이미지 생성 프롬프트 (비어있으면 자동 생성)..."
+                placeholder="이미지 생성 프롬프트..."
                 className="w-full bg-muted/30 rounded-lg p-2 text-xs resize-none focus:outline-none min-h-[40px] placeholder:text-muted-foreground/50 border border-border/50"
                 rows={2}
               />
@@ -440,6 +449,18 @@ function YoutubePanelInner({ youtubeContent, content, project, hasBaseArticle, c
                 )}
                 {selectedCard.image_url ? '이미지 재생성' : '이미지 생성'}
               </Button>
+            </div>
+
+            {/* Video prompt */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">영상 프롬프트</label>
+              <textarea
+                value={selectedCard.video_prompt ?? ''}
+                onChange={(e) => handleCardUpdate(selectedCard.id, { video_prompt: e.target.value })}
+                placeholder="영상 생성 프롬프트..."
+                className="w-full bg-muted/30 rounded-lg p-2 text-xs resize-none focus:outline-none min-h-[40px] placeholder:text-muted-foreground/50 border border-border/50"
+                rows={2}
+              />
             </div>
           </div>
         </div>

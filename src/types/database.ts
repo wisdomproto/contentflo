@@ -287,6 +287,7 @@ export interface YoutubeCard {
   subtitle_text: string | null;
   image_url: string | null;
   image_prompt: string | null;
+  video_prompt: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
