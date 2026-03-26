@@ -43,6 +43,7 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
     addInstagramCard,
     getBlogContents,
     getBlogCards,
+    setChannelModels,
   } = useProjectStore();
 
   const baseArticle = getBaseArticle(content.id);
@@ -93,6 +94,10 @@ function CardNewsPanelInner({ igContent, content, project, hasBaseArticle, chann
       updateInstagramCard(card.id, {
         text_style: { ...existing, ...resets, ...next },
       });
+    }
+    // 템플릿 선택 시 이미지 생성 비율도 자동 변경
+    if (isFullTemplate && updates.aspectRatio) {
+      setChannelModels(project.id, 'cardnews', { aspectRatio: updates.aspectRatio });
     }
   };
 
