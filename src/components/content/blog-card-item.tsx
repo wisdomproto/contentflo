@@ -31,6 +31,7 @@ interface BlogCardItemProps {
   onUpdate: (cardId: string, content: Record<string, unknown>) => void;
   onDelete: (cardId: string) => void;
   onGenerateImage?: (cardId: string) => void;
+  onAbortImage?: () => void;
   isGeneratingImage?: boolean;
   generatingCardId?: string | null;
 }
@@ -107,11 +108,13 @@ function SectionImageArea({
   content,
   onUpdate,
   onGenerateImage,
+  onAbortImage,
   isGenerating,
 }: {
   content: SectionContent;
   onUpdate: (updates: Partial<SectionContent>) => void;
   onGenerateImage?: () => void;
+  onAbortImage?: () => void;
   isGenerating: boolean;
 }) {
   const [showPrompt, setShowPrompt] = useState(!content.url);
@@ -126,6 +129,7 @@ function SectionImageArea({
         aspectClass="aspect-[4/3]"
         isGenerating={isGenerating}
         onRegenerate={onGenerateImage}
+        onAbort={onAbortImage}
         onDelete={() => {
           if (content.url) setImageHistory(prev => [content.url!, ...prev].slice(0, 10));
           onUpdate({ url: '' });
@@ -192,7 +196,7 @@ function SectionImageArea({
 }
 
 // --- Main BlogCardItem (통합 섹션) ---
-export function BlogCardItem({ card, index, onUpdate, onDelete, onGenerateImage, isGeneratingImage, generatingCardId }: BlogCardItemProps) {
+export function BlogCardItem({ card, index, onUpdate, onDelete, onGenerateImage, onAbortImage, isGeneratingImage, generatingCardId }: BlogCardItemProps) {
   const content = card.content as SectionContent;
   const isThisCardGenerating = isGeneratingImage && generatingCardId === card.id;
 
@@ -232,6 +236,7 @@ export function BlogCardItem({ card, index, onUpdate, onDelete, onGenerateImage,
         content={content}
         onUpdate={handleContentUpdate}
         onGenerateImage={onGenerateImage ? () => onGenerateImage(card.id) : undefined}
+        onAbortImage={isThisCardGenerating ? onAbortImage : undefined}
         isGenerating={isThisCardGenerating ?? false}
       />
 

@@ -61,9 +61,10 @@ interface BlogPanelInnerProps {
   project: Project;
   hasBaseArticle: boolean;
   channelModels: { textModel: string; imageModel: string; aspectRatio: string; imageStyle: string };
+  maxRetries: number;
 }
 
-function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channelModels }: BlogPanelInnerProps) {
+function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channelModels, maxRetries }: BlogPanelInnerProps) {
   const {
     getBaseArticle,
     getBlogCards,
@@ -166,7 +167,6 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
   // SEO auto-retry state
   const retryCountRef = useRef(0);
   const generateRef = useRef<(prompt: string, model: string) => void>(undefined);
-  const MAX_RETRIES = 3;
   const SEO_THRESHOLD = 0.9; // 90%
 
   function buildSeoFeedback(details: SeoDetail[]): string | null {
@@ -251,7 +251,7 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
           const seoCheck = calculateNaverSeoScore(finalTitle, newCards, { primary: currentKw, secondary: currentSecKws });
           const feedback = buildSeoFeedback(seoCheck.details);
 
-          if (feedback && retryCountRef.current < MAX_RETRIES) {
+          if (feedback && maxRetries > 0 && retryCountRef.current < maxRetries) {
             retryCountRef.current += 1;
             const retryPrompt = buildBlogPrompt({
               project,
@@ -260,7 +260,7 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
               seoTitle: finalTitle,
               keywords: { primary: currentKw, secondary: currentSecKws },
             });
-            const seoFixPrompt = `${retryPrompt}\n\n## ⚠️ SEO 점수 개선 필요 (재생성 ${retryCountRef.current}/${MAX_RETRIES}회)\n현재 총점: ${seoCheck.score}/100 (이미지 제외)\n아래 항목의 점수가 낮습니다. 반드시 개선하세요:\n${feedback}\n\n이전 응답의 전체 내용을 유지하되, 위 항목만 집중 개선하세요.`;
+            const seoFixPrompt = `${retryPrompt}\n\n## ⚠️ SEO 점수 개선 필요 (재생성 ${retryCountRef.current}/${maxRetries}회)\n현재 총점: ${seoCheck.score}/100 (이미지 제외)\n아래 항목의 점수가 낮습니다. 반드시 개선하세요:\n${feedback}\n\n이전 응답의 전체 내용을 유지하되, 위 항목만 집중 개선하세요.`;
             setTimeout(() => generateRef.current?.(seoFixPrompt, channelModels.textModel), 100);
           } else {
             retryCountRef.current = 0;
@@ -271,7 +271,7 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
         }
       },
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [blogContent.id, seoTitle, primaryKeyword, secondaryKeywords, updateBlogContent, setBlogCardsForContent, project, content, channelModels.textModel, getBaseArticle]
+      [blogContent.id, seoTitle, primaryKeyword, secondaryKeywords, updateBlogContent, setBlogCardsForContent, project, content, channelModels.textModel, getBaseArticle, maxRetries]
     ),
     onError: useCallback((err: string) => {
       retryCountRef.current = 0;
@@ -281,7 +281,7 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
   useEffect(() => { generateRef.current = generate; }, [generate]);
 
   // Image generation (공통 훅)
-  const { isGeneratingImage, generatingCardId, imageProgress, generateCardImage, generateAllImages: generateAllCardImages } = useCardImageGeneration({
+  const { isGeneratingImage, generatingCardId, imageProgress, generateCardImage, generateAllImages: generateAllCardImages, abort: abortImageGeneration } = useCardImageGeneration({
     getPrompt: (card: BlogCard) => {
       const cardContent = card.content as { image_prompt?: string; image_style?: string };
       const style = cardContent.image_style || channelModels.imageStyle || '';
@@ -534,6 +534,7 @@ function BlogPanelInner({ blogContent, content, project, hasBaseArticle, channel
               onUpdate={handleCardUpdate}
               onDelete={handleCardDelete}
               onGenerateImage={handleGenerateCardImage}
+              onAbortImage={abortImageGeneration}
               isGeneratingImage={isGeneratingImage}
               generatingCardId={generatingCardId}
             />
@@ -571,6 +572,7 @@ export function BlogPanel() {
   const { selectedContentId, contents, selectedProjectId, projects, getBaseArticle, getBlogContents, addBlogContent, updateBlogContent, deleteBlogContent, getChannelModels, setChannelModels } = useProjectStore();
   const content = contents.find((c) => c.id === selectedContentId);
   const project = projects.find((p) => p.id === selectedProjectId);
+  const [seoRetryLimit, setSeoRetryLimit] = useState(3);
   if (!content || !project) return null;
   const hasBaseArticle = !!getBaseArticle(content.id);
   const blogContents = getBlogContents(content.id);
@@ -582,18 +584,34 @@ export function BlogPanel() {
         <h2 className="text-xl font-bold">블로그 (네이버)</h2>
       </div>
 
-      {/* Model Selector + Image Settings */}
-      <ChannelModelSelector
-        textModel={channelModels.textModel}
-        imageModel={channelModels.imageModel}
-        onTextModelChange={(m) => setChannelModels(project.id, 'blog', { textModel: m })}
-        onImageModelChange={(m) => setChannelModels(project.id, 'blog', { imageModel: m })}
-        aspectRatio={channelModels.aspectRatio}
-        onAspectRatioChange={(r) => setChannelModels(project.id, 'blog', { aspectRatio: r })}
-        imageStyle={channelModels.imageStyle}
-        onImageStyleChange={(s) => setChannelModels(project.id, 'blog', { imageStyle: s })}
-        defaultAspectRatio="16:9"
-      />
+      {/* Model Selector + Image Settings + SEO Retry */}
+      <div className="flex items-start gap-4 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <ChannelModelSelector
+            textModel={channelModels.textModel}
+            imageModel={channelModels.imageModel}
+            onTextModelChange={(m) => setChannelModels(project.id, 'blog', { textModel: m })}
+            onImageModelChange={(m) => setChannelModels(project.id, 'blog', { imageModel: m })}
+            aspectRatio={channelModels.aspectRatio}
+            onAspectRatioChange={(r) => setChannelModels(project.id, 'blog', { aspectRatio: r })}
+            imageStyle={channelModels.imageStyle}
+            onImageStyleChange={(s) => setChannelModels(project.id, 'blog', { imageStyle: s })}
+            defaultAspectRatio="16:9"
+          />
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0 pt-1">
+          <label className="text-xs text-muted-foreground whitespace-nowrap">SEO 재생성</label>
+          <Input
+            type="number"
+            min={0}
+            max={10}
+            value={seoRetryLimit}
+            onChange={(e) => setSeoRetryLimit(Math.max(0, Math.min(10, parseInt(e.target.value) || 0)))}
+            className="w-14 h-8 text-sm text-center"
+          />
+          <span className="text-xs text-muted-foreground">회</span>
+        </div>
+      </div>
 
       {/* Content List */}
       <ChannelContentList<BlogContent>
@@ -612,6 +630,7 @@ export function BlogPanel() {
             project={project}
             hasBaseArticle={hasBaseArticle}
             channelModels={channelModels}
+            maxRetries={seoRetryLimit}
           />
         )}
       />

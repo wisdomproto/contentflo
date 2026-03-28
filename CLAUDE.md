@@ -52,9 +52,9 @@ src/
 │   │   ├── blog-panel.tsx             # 블로그 (네이버) — Outer+Inner + 전략 키워드 배너
 │   │   ├── blog-card-item.tsx         # 블로그 카드 컴포넌트
 │   │   ├── blog-preview-dialog.tsx    # 블로그 미리보기
-│   │   ├── cardnews-panel.tsx         # 카드뉴스 (인스타그램) — Outer+Inner 패턴
-│   │   ├── cardnews-card-item.tsx     # 카드뉴스 슬라이드 컴포넌트 (5개 레이아웃 렌더러)
-│   │   ├── cardnews-templates.ts     # 카드뉴스 18종 템플릿 정의 (4 카테고리)
+│   │   ├── cardnews-panel.tsx         # 카드뉴스 (인스타그램) — 캔버스 기반 에디터
+│   │   ├── cardnews-card-item.tsx     # 카드뉴스 캔버스 (드래그 텍스트 블록 + 그리드 스냅)
+│   │   ├── cardnews-templates.ts     # 카드뉴스 8종 템플릿 + 커스텀 템플릿
 │   │   ├── threads-panel.tsx          # 스레드 — Outer+Inner 패턴
 │   │   ├── threads-card-item.tsx      # 스레드 포스트 컴포넌트
 │   │   ├── threads-preview-dialog.tsx # 스레드 미리보기
@@ -150,7 +150,7 @@ Project (프로젝트 설정 + API 키 + 퍼널 + GA4)
 ## 채널 구현 상태
 - [x] 기본글 (BaseArticle) — TipTap 에디터, AI 주제 추천, 글 생성
 - [x] 블로그 (네이버) — SEO 설정, 카드 에디터, AI 생성, 이미지 생성, 미리보기, 전략 키워드 배너
-- [x] 카드뉴스 (인스타그램) — 캡션/해시태그, 슬라이드 에디터, 참조 이미지, AI 2단계 생성, 전체 다운로드, 18종 템플릿 (5개 레이아웃)
+- [x] 카드뉴스 (인스타그램) — 4:5 고정 캔버스, PPT스타일 드래그 텍스트 블록 (헤더/제목/본문/푸터), 10% 그리드 스냅, 이미지 위아래 드래그, 블록별 폰트/색상/그림자/보이기, 8종+커스텀 템플릿, 템플릿 속성 편집, 이미지 붙여넣기/드래그앤드롭/업로드/다운로드, 배치 이미지 생성(탭전환 유지), AI 4-zone 텍스트 생성
 - [x] 스레드 — 멀티포스트, AI 생성, 이미지 생성, 미리보기, 전체 복사
 - [x] 유튜브 — Vrew 스타일 3단 UI (프리뷰+스크립트 편집+타임라인), 씬별 이미지 생성, 대본 생성, 미리보기, 전체 복사
 

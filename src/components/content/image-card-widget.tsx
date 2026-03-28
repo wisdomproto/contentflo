@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, Download, Upload, Loader2, ZoomIn, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Trash2, RefreshCw, Download, Upload, Loader2, ZoomIn, ChevronLeft, ChevronRight, Wand2, X } from 'lucide-react';
 import { ImageLightbox } from './image-lightbox';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +16,8 @@ export interface ImageCardWidgetProps {
   aspectClass?: string;
   /** Called when regenerate button is clicked */
   onRegenerate?: () => void;
+  /** Called when generation is aborted */
+  onAbort?: () => void;
   /** Called when image is deleted */
   onDelete?: () => void;
   /** Called when a new image file is uploaded (drag & drop or click) */
@@ -26,6 +28,8 @@ export interface ImageCardWidgetProps {
   isGenerating?: boolean;
   /** Placeholder when no image */
   placeholder?: string;
+  /** Hide bottom action buttons (for inline/compact usage) */
+  hideBottomActions?: boolean;
   className?: string;
 }
 
@@ -35,11 +39,13 @@ export function ImageCardWidget({
   history = [],
   aspectClass = 'aspect-[4/3]',
   onRegenerate,
+  onAbort,
   onDelete,
   onUpload,
   onRestore,
   isGenerating = false,
   placeholder = '이미지가 없습니다',
+  hideBottomActions = false,
   className,
 }: ImageCardWidgetProps) {
   const [showLightbox, setShowLightbox] = useState(false);
@@ -169,6 +175,24 @@ export function ImageCardWidget({
           </div>
         )}
       </div>
+
+      {/* Generate / Regenerate / Cancel buttons below image */}
+      {onRegenerate && !hideBottomActions && (
+        <div className="mt-2 flex gap-2">
+          {isGenerating ? (
+            onAbort && (
+              <Button variant="outline" size="sm" onClick={onAbort} className="gap-1.5 text-xs">
+                <X size={14} /> 취소
+              </Button>
+            )
+          ) : (
+            <Button variant="outline" size="sm" onClick={onRegenerate} className="gap-1.5 text-xs">
+              {src ? <RefreshCw size={14} /> : <Wand2 size={14} />}
+              {src ? '재생성' : '이미지 생성'}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* History strip */}
       {showHistory && history.length > 0 && (

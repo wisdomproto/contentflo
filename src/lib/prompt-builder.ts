@@ -333,8 +333,10 @@ export function buildCardNewsImagePromptsPrompt(ctx: PromptContext): string {
   "hashtags": ["태그1", "태그2", "태그3"],
   "slides": [
     {
-      "headline": "헤드라인 (10~15자)",
-      "body": "본문 텍스트 (30~50자, 최대 70자)",
+      "header": "카테고리/라벨 (5~10자)",
+      "title": "메인 제목 (10~15자)",
+      "body": "본문 설명 (30~50자)",
+      "footer": "CTA 또는 출처 (10~20자)",
       "image_prompt": "English image generation prompt"
     }
   ]
@@ -346,12 +348,14 @@ export function buildCardNewsImagePromptsPrompt(ctx: PromptContext): string {
   sections.push('- "궁금하다면 넘겨보세요", "지금 바로 확인하세요" 같은 유도 문구는 쓰지 마세요.');
   sections.push('- 핵심 정보, 수치, 팩트를 구체적으로 나열하세요.');
   sections.push('- 이모지는 구분자 용도로 적절히 사용.');
-  sections.push('\n슬라이드 텍스트 규칙:');
-  sections.push('- headline: 헤드라인. 10~15자. 한눈에 읽히는 핵심 키워드/문장.');
-  sections.push('- body: 본문 텍스트. 30~50자 (최대 70자). 해당 슬라이드의 핵심 내용 요약.');
-  sections.push('- headline + body 합계 40~80자. 여백 포함 가독성 고려.');
-  sections.push('- 첫 슬라이드: 주목을 끄는 타이틀 (headline만 크게, body는 부제목)');
-  sections.push('- 마지막 슬라이드: 핵심 요약 또는 정리');
+  sections.push('\n슬라이드 텍스트 규칙 (4-zone 구조):');
+  sections.push('- header: 상단 라벨/카테고리. 5~10자. 예: "건강 상식", "STEP 1", "알고 계셨나요?"');
+  sections.push('- title: 메인 제목. 15~25자. 해당 슬라이드의 핵심 메시지를 완전한 문장으로.');
+  sections.push('- body: 본문 설명. 50~100자. 이미지 없이 텍스트만 읽어도 내용이 완전히 이해되도록 구체적으로 작성. 수치, 이유, 방법 등 핵심 정보를 빠짐없이 포함. 너무 축약하지 말 것.');
+  sections.push('- footer: 하단 텍스트. 10~20자. CTA, 출처, 페이지 번호 등.');
+  sections.push('- ⚠️ 중요: 전체 슬라이드의 텍스트(title+body)만 순서대로 읽었을 때, 원문의 핵심 내용을 모두 파악할 수 있어야 합니다. 키워드 나열이 아닌 설명형 문장으로 작성하세요.');
+  sections.push('- 첫 슬라이드: header=카테고리, title=주목 타이틀, body=글 전체를 요약하는 부제목, footer=브랜드/날짜');
+  sections.push('- 마지막 슬라이드: header 생략, title=핵심 요약, body=실천 방법 또는 정리, footer=CTA(팔로우/저장)');
   sections.push('\n슬라이드 이미지 가이드:');
   sections.push('- 총 5~10장 슬라이드로 구성하세요.');
   sections.push('- image_prompt는 반드시 영어로 작성하세요 (이미지 모델 최적화)');
@@ -586,8 +590,9 @@ export function buildYoutubeImagePrompt(
     parts.push(project.youtube_image_style_prompt);
   }
 
-  parts.push('Wide angle, 16:9 composition, suitable for YouTube video thumbnail/scene. No text or watermarks in the image.');
-  parts.push('Korean context: any text shown must be in Korean (한글). People should be East Asian / Korean appearance.');
+  parts.push('Wide angle, 16:9 composition, suitable for YouTube video scene.');
+  parts.push('IMPORTANT: Do NOT include any text, titles, subtitles, captions, watermarks, or letters in the image. The image must be purely visual with no written content whatsoever.');
+  parts.push('Korean context: people should be East Asian / Korean appearance.');
 
   return parts.join('\n');
 }
@@ -616,7 +621,7 @@ export function buildYoutubeVideoPrompt(
   }
 
   if (card.subtitle_text) {
-    parts.push(`On-screen text: ${card.subtitle_text}`);
+    parts.push(`Scene context: ${card.subtitle_text}`);
   }
 
   // section_type에 따른 영상 모션 힌트
@@ -637,7 +642,8 @@ export function buildYoutubeVideoPrompt(
   }
 
   parts.push('16:9 video composition. Smooth camera movement, professional production quality.');
-  parts.push('Korean context: any text overlay must be in Korean (한글). People should be East Asian / Korean appearance.');
+  parts.push('IMPORTANT: Do NOT include any text, titles, subtitles, captions, watermarks, or letters in the video. The video must be purely visual.');
+  parts.push('Korean context: people should be East Asian / Korean appearance.');
 
   return parts.join('\n');
 }

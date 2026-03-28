@@ -53,11 +53,11 @@ function ContentItem({
   const statusLabel = content.status === 'draft' ? '초안' : content.status === 'in_progress' ? '작성중' : '게시완료';
 
   return (
-    <div className="group flex items-center">
+    <div className="group flex items-center overflow-hidden">
       <button
         onClick={onSelect}
         className={cn(
-          'flex-1 flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors',
+          'flex-1 min-w-0 flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors',
           'hover:bg-accent',
           isSelected && 'bg-primary/10 dark:bg-primary/20'
         )}
@@ -73,14 +73,14 @@ function ContentItem({
               if (e.key === 'Enter') handleRename();
               if (e.key === 'Escape') setIsRenaming(false);
             }}
-            className="flex-1 text-sm bg-transparent outline-none border-b border-primary"
+            className="flex-1 min-w-0 text-sm bg-transparent outline-none border-b border-primary"
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
-          <span className="flex-1 text-left truncate">{content.title}</span>
+          <span className="flex-1 min-w-0 text-left truncate" title={content.title}>{content.title}</span>
         )}
         <span className={cn(
-          'text-[10px] px-1.5 py-0.5 rounded-full shrink-0',
+          'text-[10px] px-1 py-0.5 rounded-full shrink-0',
           content.status === 'draft' && 'bg-muted text-muted-foreground',
           content.status === 'in_progress' && 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300',
           content.status === 'published' && 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300',
@@ -92,7 +92,7 @@ function ContentItem({
         <DropdownMenuTrigger
           render={
             <button
-              className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-accent transition-opacity"
+              className="shrink-0 p-1 rounded hover:bg-accent transition-colors"
               onClick={(e) => e.stopPropagation()}
             />
           }
@@ -144,12 +144,15 @@ function ProjectItem({
 
   useEffect(() => {
     if (isSelected && !expanded) setExpanded(true);
-  }, [isSelected, expanded]);
+  }, [isSelected]);
 
   const handleToggle = () => {
-    const next = !expanded;
-    setExpanded(next);
-    if (next) selectProject(project.id);
+    if (expanded) {
+      setExpanded(false);
+    } else {
+      setExpanded(true);
+      selectProject(project.id);
+    }
   };
 
   const handleRename = () => {

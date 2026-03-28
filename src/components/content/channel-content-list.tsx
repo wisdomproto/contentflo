@@ -84,7 +84,7 @@ export function ChannelContentList<T>({
           <div key={id} className="rounded-lg border border-border bg-background overflow-hidden">
             {/* Header */}
             <div
-              className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors"
+              className="flex items-center gap-1.5 px-2 py-2 cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden"
               onClick={() => toggleExpand(id)}
             >
               <ChevronDown
@@ -106,10 +106,10 @@ export function ChannelContentList<T>({
                   onBlur={finishEditing}
                   onClick={(e) => e.stopPropagation()}
                   autoFocus
-                  className="flex-1 text-sm font-medium bg-transparent border-b border-primary outline-none px-0"
+                  className="min-w-0 max-w-[120px] text-xs font-medium bg-transparent border-b border-primary outline-none px-0"
                 />
               ) : (
-                <span className="flex-1 text-sm font-medium truncate">{title}</span>
+                <span className="min-w-0 max-w-[120px] text-xs font-medium truncate" title={title}>{title}</span>
               )}
 
               <Badge variant="secondary" className="text-[10px] shrink-0">
@@ -122,7 +122,7 @@ export function ChannelContentList<T>({
                     variant="ghost"
                     size="sm"
                     onClick={finishEditing}
-                    className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                    className="h-6 w-6 p-0"
                   >
                     <Check size={12} />
                   </Button>
@@ -131,7 +131,7 @@ export function ChannelContentList<T>({
                     variant="ghost"
                     size="sm"
                     onClick={() => startEditing(id, title)}
-                    className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                    className="h-6 w-6 p-0"
                   >
                     <Pencil size={12} />
                   </Button>
@@ -140,7 +140,7 @@ export function ChannelContentList<T>({
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDelete(id)}
-                  className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                  className="h-6 w-6 p-0 hover:text-destructive"
                 >
                   <Trash2 size={12} />
                 </Button>
